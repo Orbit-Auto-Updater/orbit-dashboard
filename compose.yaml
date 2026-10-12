@@ -1,0 +1,92 @@
+# Linux Dash: production stack (dashboard + PostgreSQL, optional Caddy for HTTPS).
+#
+#   cp .env.example .env   # set POSTGRES_PASSWORD (and DOMAIN for HTTPS)
+#   docker compose up -d                    # dashboard on 127.0.0.1:3000
+#   docker compose --profile https up -d    # + Caddy with automatic HTTPS on :80/:443
+#   docker compose logs dashboard | grep "setup code"
+#
+# See DEPLOY.md for details. For a single container with SQLite use compose.sqlite.yaml.
+
+name: linux-dash
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  dashboard:
+    <<: *hardening
+    build:
+      context: .
+      additional_contexts:
+        agent: ../linux-dash-agent
+      args:
+        AGENT_VERSION: ${AGENT_VERSION:-dev}
+    image: ${DASHBOARD_IMAGE:-linux-dash:latest}
+    environment:
+      DATABASE_URL: postgres://linuxdash:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/linuxdash
+      TZ: ${TZ:-UTC}
+    volumes:
+      - dashboard-data:/data
+    ports:
+      # Loopback only by default: put the bundled Caddy (or your own proxy) in front.
+      - "${DASHBOARD_BIND:-127.0.0.1}:${DASHBOARD_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache:uid=10001,gid=10001
+    cap_drop: [ALL]
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits: { memory: 1g }
+
+  postgres:
+    <<: *hardening
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: linuxdash
+      POSTGRES_USER: linuxdash
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U linuxdash -d linuxdash"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    shm_size: 128m
+    stop_grace_period: 60s
+
+  caddy:
+    <<: *hardening
+    profiles: ["https"]
+    image: caddy:2.10-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env to use the https profile}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      dashboard:
+        condition: service_healthy
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+
+volumes:
+  dashboard-data:
+  postgres-data:
+  caddy-data:
+  caddy-config:

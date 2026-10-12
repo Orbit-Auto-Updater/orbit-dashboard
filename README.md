@@ -2,7 +2,17 @@
 
 Dashboard for monitoring Linux servers and the apps on them (Docker, PM2, systemd), installing package updates, and tracking vulnerable packages (CVEs). Each server runs the [linux-dash-agent](../linux-dash-agent), which connects out to this dashboard.
 
-## Run it
+## Run it with Docker (production)
+
+```bash
+cp .env.example .env    # set POSTGRES_PASSWORD, DOMAIN, ACME_EMAIL
+docker compose --profile https up -d --build
+docker compose logs dashboard | grep "setup code"
+```
+
+This runs the dashboard, PostgreSQL and Caddy (automatic HTTPS). The image also serves the agent installer and binaries. See **[DEPLOY.md](DEPLOY.md)** for SQLite, your own reverse proxy, backups and upgrades.
+
+## Run it from source
 
 ```bash
 pnpm install
@@ -23,7 +33,7 @@ Requires Node.js 22.13+ (SQLite uses the built-in `node:sqlite`, so there are no
 | Variable | Purpose |
 | --- | --- |
 | `LINUX_DASH_DATA_DIR` | Where `config.json`, the setup code and the default SQLite file live. Default `./data`. Keep it on persistent storage. |
-| `DATABASE_URL` | Overrides the wizard's database choice: `postgres://user:pass@host/db?sslmode=require` or `sqlite:/path/to/file.db`. Tables are created on first start. |
+| `DATABASE_URL` | Overrides the wizard's database choice: `postgres://user:pass@host/db?sslmode=require` or `sqlite:/path/to/file.db`. Tables are created on first start. `DATABASE_URL_FILE` reads it from a file (Docker secrets). |
 | `AGENT_DIST_DIR` | Where agent release files are served from (`/install.sh`, `/downloads/…`). Default `data/agent`, falling back to `../linux-dash-agent/dist`. |
 
 Put the dashboard behind HTTPS (a reverse proxy such as Caddy or nginx) in production. Session cookies are marked `Secure` when the request is HTTPS (`X-Forwarded-Proto` is honoured).

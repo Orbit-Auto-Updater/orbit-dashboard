@@ -11,14 +11,14 @@ export function agentDistDirs() {
 export function findDistFile(name: string): string | null {
   for (const dir of agentDistDirs()) {
     const p = path.join(dir, name);
-    if (fs.existsSync(p) && fs.statSync(p).isFile()) return p;
+    if (fs.existsSync(/*turbopackIgnore: true*/ p) && fs.statSync(/*turbopackIgnore: true*/ p).isFile()) return p;
   }
   return null;
 }
 
 export function installScript(publicUrl: string): string | null {
-  const file = findDistFile("install.sh") ?? (fs.existsSync(path.resolve(process.cwd(), "../linux-dash-agent/deploy/install.sh")) ? path.resolve(process.cwd(), "../linux-dash-agent/deploy/install.sh") : null);
+  const file = findDistFile("install.sh") ?? (fs.existsSync(/*turbopackIgnore: true*/ path.resolve(process.cwd(), "../linux-dash-agent/deploy/install.sh")) ? path.resolve(process.cwd(), "../linux-dash-agent/deploy/install.sh") : null);
   if (!file) return null;
   // Default the dashboard address to this dashboard, so `curl … | sudo sh` needs no flags.
-  return fs.readFileSync(file, "utf8").replace("SERVER=${LINUX_DASH_SERVER:-}", `SERVER=\${LINUX_DASH_SERVER:-${publicUrl.replace(/[^A-Za-z0-9:/._~\-[\]]/g, "")}}`);
+  return fs.readFileSync(/*turbopackIgnore: true*/ file, "utf8").replace("SERVER=${LINUX_DASH_SERVER:-}", `SERVER=\${LINUX_DASH_SERVER:-${publicUrl.replace(/[^A-Za-z0-9:/._~\-[\]]/g, "")}}`);
 }

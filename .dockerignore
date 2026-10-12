@@ -1,0 +1,16 @@
+# Keep the build context small and free of local state and secrets.
+.git
+.next
+node_modules
+data
+.env
+.env.*
+!.env.example
+.simulated-agents.json
+.claude
+*.log
+coverage
+Dockerfile
+compose*.yaml
+Caddyfile
+DEPLOY.md

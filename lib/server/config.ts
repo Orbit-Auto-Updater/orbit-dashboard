@@ -19,18 +19,20 @@ export type AppConfig = {
 };
 
 export function dataDir() {
-  return path.resolve(process.env.LINUX_DASH_DATA_DIR || path.join(process.cwd(), "data"));
+  // turbopackIgnore: this is a runtime location, not a build input; without it
+  // the file tracer copies the whole project (including data/) into the bundle.
+  return path.resolve(/*turbopackIgnore: true*/ process.env.LINUX_DASH_DATA_DIR || path.join(process.cwd(), "data"));
 }
 
-const configFile = () => path.join(dataDir(), "config.json");
+const configFile = () => path.join(/*turbopackIgnore: true*/ dataDir(), "config.json");
 
 let cache: { mtimeMs: number; value: AppConfig } | null = null;
 
 export function readConfig(): AppConfig {
   try {
-    const st = fs.statSync(configFile());
+    const st = fs.statSync(/*turbopackIgnore: true*/ configFile());
     if (cache && cache.mtimeMs === st.mtimeMs) return cache.value;
-    const value = JSON.parse(fs.readFileSync(configFile(), "utf8")) as AppConfig;
+    const value = JSON.parse(fs.readFileSync(/*turbopackIgnore: true*/ configFile(), "utf8")) as AppConfig;
     cache = { mtimeMs: st.mtimeMs, value };
     return value;
   } catch (err) {
@@ -41,10 +43,10 @@ export function readConfig(): AppConfig {
 
 export function writeConfig(patch: Partial<AppConfig>) {
   const next = { ...readConfig(), ...patch };
-  fs.mkdirSync(dataDir(), { recursive: true, mode: 0o700 });
+  fs.mkdirSync(/*turbopackIgnore: true*/ dataDir(), { recursive: true, mode: 0o700 });
   const tmp = configFile() + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(next, null, 2), { mode: 0o600 });
-  fs.renameSync(tmp, configFile());
+  fs.writeFileSync(/*turbopackIgnore: true*/ tmp, JSON.stringify(next, null, 2), { mode: 0o600 });
+  fs.renameSync(/*turbopackIgnore: true*/ tmp, configFile());
   cache = null;
 }
 
@@ -59,8 +61,19 @@ export function parseDatabaseUrl(url: string): DbConfig | null {
   return null;
 }
 
+let fileUrl: { path: string; url: string } | null = null;
+
+/**
+ * DATABASE_URL, or DATABASE_URL_FILE pointing at a file that contains it
+ * (e.g. a Docker secret), so the password needn't sit in the environment.
+ */
 export function envDatabase(): DbConfig | null {
-  const url = process.env.DATABASE_URL;
+  let url = process.env.DATABASE_URL;
+  const file = process.env.DATABASE_URL_FILE;
+  if (!url && file) {
+    if (fileUrl?.path !== file) fileUrl = { path: file, url: fs.readFileSync(/*turbopackIgnore: true*/ file, "utf8").trim() };
+    url = fileUrl.url;
+  }
   return url ? parseDatabaseUrl(url) : null;
 }
 
@@ -78,17 +91,16 @@ export function isSetupComplete(): boolean {
  * printed to the server log and stored in the data directory.
  */
 export function getSetupCode(): string {
-  const file = path.join(dataDir(), "setup-code");
+  const file = path.join(/*turbopackIgnore: true*/ dataDir(), "setup-code");
   try {
-    return fs.readFileSync(file, "utf8").trim();
+    return fs.readFileSync(/*turbopackIgnore: true*/ file, "utf8").trim();
   } catch {
     const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const bytes = crypto.randomBytes(8);
     const raw = Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
     const code = `${raw.slice(0, 4)}-${raw.slice(4)}`;
-    fs.mkdirSync(dataDir(), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(file, code + "\n", { mode: 0o600 });
-    console.log(`\n  Linux Dash setup code: ${code}\n  (also stored in ${file})\n`);
+    fs.mkdirSync(/*turbopackIgnore: true*/ dataDir(), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(/*turbopackIgnore: true*/ file, code + "\n", { mode: 0o600 });
     return code;
   }
 }
@@ -101,5 +113,5 @@ export function checkSetupCode(given: string | null | undefined): boolean {
 }
 
 export function clearSetupCode() {
-  fs.rmSync(path.join(dataDir(), "setup-code"), { force: true });
+  fs.rmSync(/*turbopackIgnore: true*/ path.join(dataDir(), "setup-code"), { force: true });
 }

@@ -1,4 +1,5 @@
 /** Helpers shared by the route handlers. */
+import { connection } from "next/server";
 import { NotConfiguredError } from "./db";
 
 export class ApiError extends Error {
@@ -19,6 +20,9 @@ type Ctx = { params: Promise<Record<string, string>> };
  */
 export function route<C extends Ctx = Ctx>(fn: (req: Request, ctx: C) => Promise<unknown>) {
   return async (req: Request, ctx: C): Promise<Response> => {
+    // Every API response depends on the request and live data: never
+    // prerender at build time (that would also run handler side effects).
+    await connection();
     try {
       if (req.method !== "GET" && req.method !== "HEAD") checkOrigin(req);
       const out = await fn(req, ctx);

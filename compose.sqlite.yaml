@@ -1,0 +1,39 @@
+# Linux Dash: single container with SQLite (small fleets, quick start).
+#
+#   docker compose -f compose.sqlite.yaml up -d
+#   docker compose -f compose.sqlite.yaml logs dashboard | grep "setup code"
+#
+# In the setup wizard choose SQLite and keep the default path (/data/linux-dash.db).
+# Put HTTPS in front before exposing it beyond localhost (see DEPLOY.md).
+
+name: linux-dash
+
+services:
+  dashboard:
+    build:
+      context: .
+      additional_contexts:
+        agent: ../linux-dash-agent
+      args:
+        AGENT_VERSION: ${AGENT_VERSION:-dev}
+    image: ${DASHBOARD_IMAGE:-linux-dash:latest}
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      - dashboard-data:/data
+    ports:
+      - "${DASHBOARD_BIND:-127.0.0.1}:${DASHBOARD_PORT:-3000}:3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache:uid=10001,gid=10001
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+volumes:
+  dashboard-data:

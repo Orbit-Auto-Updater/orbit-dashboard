@@ -1,0 +1,28 @@
+# HTTPS reverse proxy for Linux Dash (used by `docker compose --profile https`).
+# With a public DNS name Caddy obtains a Let's Encrypt certificate automatically.
+# For an internal-only name or IP, replace the email line with `tls internal`
+# and give agents Caddy's root CA (installer: --ca-file).
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	reverse_proxy dashboard:3000 {
+		# Agent reports can take a moment while the server ingests them.
+		transport http {
+			read_timeout 60s
+		}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -12,6 +12,7 @@ const PUBLIC = [/^\/login$/, /^\/invite\//, /^\/api\/auth\//, /^\/api\/invite\//
 export function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
   const isApi = pathname.startsWith("/api/");
+  if (pathname === "/api/health") return NextResponse.next();
 
   if (!isSetupComplete()) {
     if (pathname === "/setup" || pathname.startsWith("/api/setup/")) return NextResponse.next();
