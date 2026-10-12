@@ -29,6 +29,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
         -o /dist/linux-dash-agent-linux-$arch ./cmd/linux-dash-agent; \
     done; \
     cp deploy/install.sh /dist/install.sh; \
+    echo "${AGENT_VERSION}" > /dist/VERSION; \
     cd /dist && sha256sum linux-dash-agent-linux-* > SHA256SUMS
 
 # ----------------------------------------------------------------- deps ---

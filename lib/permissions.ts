@@ -61,6 +61,7 @@ export const BUILTIN_ROLES: { id: string; name: string; description: string; per
 /** Permission required to send each agent command type. */
 export function commandPermission(type: string): Permission | null {
   if (type === "agent.refresh") return "metrics.view";
+  if (type === "agent.update") return "servers.manage";
   if (type === "updates.check" || type === "updates.apply") return "updates.run";
   if (type === "host.reboot") return "servers.reboot";
   if (/^(docker|pm2|systemd)\.(start|stop|restart)$/.test(type)) return "apps.control";

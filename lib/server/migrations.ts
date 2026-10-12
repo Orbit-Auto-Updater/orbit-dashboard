@@ -296,8 +296,72 @@ const initial: Migration = {
   },
 };
 
+const jobs: Migration = {
+  async up(db: Kysely<any>) {
+    await db.schema
+      .createTable("jobs")
+      .ifNotExists()
+      .addColumn("id", "text", (c) => c.primaryKey())
+      .addColumn("kind", "text", (c) => c.notNull())
+      .addColumn("label", "text", (c) => c.notNull())
+      .addColumn("trigger", "text", (c) => c.notNull())
+      .addColumn("args", "text", (c) => c.notNull())
+      .addColumn("created_by", "text")
+      .addColumn("created_by_name", "text", (c) => c.notNull())
+      .addColumn("created_at", "bigint", (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex("jobs_created").ifNotExists().on("jobs").column("created_at").execute();
+
+    await db.schema
+      .createTable("job_targets")
+      .ifNotExists()
+      .addColumn("id", "text", (c) => c.primaryKey())
+      .addColumn("job_id", "text", (c) => c.notNull().references("jobs.id").onDelete("cascade"))
+      .addColumn("server_id", "text", (c) => c.notNull().references("servers.id").onDelete("cascade"))
+      .addColumn("command_id", "text")
+      .addColumn("run_id", "text")
+      .addColumn("status", "text", (c) => c.notNull())
+      .addColumn("phase", "text", (c) => c.notNull().defaultTo(""))
+      .addColumn("total", "integer", (c) => c.notNull().defaultTo(0))
+      .addColumn("installed", "text", (c) => c.notNull().defaultTo("[]"))
+      .addColumn("log_lines", "integer", (c) => c.notNull().defaultTo(0))
+      .addColumn("started_at", "bigint")
+      .addColumn("finished_at", "bigint")
+      .addColumn("error", "text")
+      .addColumn("updated_at", "bigint", (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex("job_targets_job").ifNotExists().on("job_targets").column("job_id").execute();
+    await db.schema.createIndex("job_targets_command").ifNotExists().on("job_targets").column("command_id").execute();
+    await db.schema.createIndex("job_targets_run").ifNotExists().on("job_targets").columns(["server_id", "run_id"]).execute();
+    await db.schema.createIndex("job_targets_status").ifNotExists().on("job_targets").column("status").execute();
+
+    await db.schema
+      .createTable("job_logs")
+      .ifNotExists()
+      .addColumn("target_id", "text", (c) => c.notNull().references("job_targets.id").onDelete("cascade"))
+      .addColumn("seq", "integer", (c) => c.notNull())
+      .addColumn("ts", "bigint", (c) => c.notNull())
+      .addColumn("stream", "text", (c) => c.notNull())
+      .addColumn("text", "text", (c) => c.notNull())
+      .addPrimaryKeyConstraint("job_logs_pk", ["target_id", "seq"])
+      .execute();
+  },
+};
+
+const agents: Migration = {
+  async up(db: Kysely<any>) {
+    // What each agent reports about its own config (actions, monitors, version support).
+    await db.schema.alterTable("servers").addColumn("agent_info", "text").execute();
+    // The OSV cache stored full advisories (hundreds of MB); entries are now
+    // slimmed on write, so drop the old ones and let scans refill it.
+    await db.deleteFrom("osv_cache").execute();
+  },
+};
+
 export const migrations: Record<string, Migration> = {
   "2026_10_12_001_initial": initial,
+  "2026_10_13_002_jobs": jobs,
+  "2026_10_13_003_agents": agents,
 };
 
 class StaticProvider implements MigrationProvider {

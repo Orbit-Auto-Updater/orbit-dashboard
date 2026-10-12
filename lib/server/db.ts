@@ -9,7 +9,7 @@ import { DatabaseSync } from "node:sqlite";
 import { Kysely, PostgresDialect, SqliteDialect, sql, type SqliteDatabase } from "kysely";
 import pg from "pg";
 import { getDbConfig, type DbConfig } from "./config";
-import { migrateToLatest } from "./migrations";
+import { migrateToLatest, migrations } from "./migrations";
 import type { DB } from "./schema";
 
 export class NotConfiguredError extends Error {
@@ -72,11 +72,13 @@ const g = globalThis as unknown as { __linuxDashDb?: Cached };
 export async function getDb(): Promise<Kysely<DB>> {
   const cfg = getDbConfig();
   if (!cfg) throw new NotConfiguredError();
-  const key = JSON.stringify(cfg);
+  // The migration list is part of the key: when code with a new migration is
+  // loaded (dev hot reload, or a long-running process) it gets applied.
+  const key = JSON.stringify(cfg) + "|" + Object.keys(migrations).join(",");
   if (g.__linuxDashDb?.key !== key) {
     const old = g.__linuxDashDb;
     const db = createDb(cfg);
-    g.__linuxDashDb = { key, db, ready: migrateToLatest(db).then(() => undefined) };
+    g.__linuxDashDb = { key, db, ready: migrateToLatest(db).then(() => (cfg.engine === "sqlite" ? compactIfBloated(db) : undefined)) };
     old?.db.destroy().catch(() => {});
   }
   const cur = g.__linuxDashDb!;
@@ -87,6 +89,16 @@ export async function getDb(): Promise<Kysely<DB>> {
     throw err;
   }
   return cur.db;
+}
+
+/** Reclaim space after large deletions (e.g. the OSV cache trim in migration 003). */
+async function compactIfBloated(db: Kysely<DB>) {
+  const pragma = async (name: "page_count" | "freelist_count") => Number(Object.values((await sql.raw(`pragma ${name}`).execute(db)).rows[0] ?? {})[0] ?? 0);
+  const [pages, free] = [await pragma("page_count"), await pragma("freelist_count")];
+  if (free > 25_000 && free > pages * 0.3) {
+    console.log(`[db] compacting SQLite database (${Math.round((free * 4096) / 1048576)} MB unused)…`);
+    await sql`vacuum`.execute(db);
+  }
 }
 
 /** Open a connection with the given settings and run a trivial query. */

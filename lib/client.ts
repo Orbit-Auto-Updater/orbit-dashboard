@@ -141,6 +141,43 @@ export function useCommand() {
   );
 }
 
+/** Current time, refreshed every intervalMs (0 until the first tick after mount). */
+export function useNow(intervalMs = 1000) {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const id = setInterval(tick, intervalMs);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [intervalMs]);
+  return now;
+}
+
+// ----------------------------------------------------------------- update jobs
+
+/**
+ * Start an update install job and open its live view.
+ * body: { serverIds: [...] | "all", packages?: [...], securityOnly?: true }
+ */
+export function useStartUpdateJob() {
+  const { toast } = useToast();
+  return useCallback(
+    async (body: { serverIds: string[] | "all"; packages?: string[]; securityOnly?: boolean }) => {
+      try {
+        const r = await api<{ jobId: string; queued: number }>("/api/jobs", { body });
+        window.location.assign(`/jobs/${r.jobId}`);
+        return r;
+      } catch (err) {
+        toast({ title: "Couldn't start the update", body: (err as Error).message, tone: "error" });
+      }
+    },
+    [toast],
+  );
+}
+
 // ------------------------------------------------------------------ formatting
 
 export function ago(ts: number | string | null | undefined, now = Date.now()) {

@@ -73,6 +73,19 @@ export type Report = {
   updates?: UpdateStatus;
   logs?: LogEntry[];
   results?: CommandResult[];
+  agent?: AgentInfo;
+};
+
+export type AgentInfo = {
+  version: string;
+  report_interval_seconds: number;
+  actions: Record<string, boolean>;
+  features: Record<string, boolean>;
+  package_manager?: string;
+  self_update: boolean;
+  supervisor?: string;
+  config_path?: string;
+  last_update?: { from: string; to: string; status: "confirmed" | "rolled_back"; detail?: string; finished_at: string };
 };
 
 export type Policy = {
@@ -86,10 +99,31 @@ export type Policy = {
 
 export type Command = { id: string; type: string; args?: unknown; issued_at?: string };
 
+export type LogLine = { t: string; s: string; text: string };
+export type InstalledPackage = { name: string; version?: string; t: string };
+
+/** Live progress of a long-running job (see PROTOCOL.md). */
+export type Progress = {
+  run_id: string;
+  command_id?: string;
+  kind: string;
+  trigger: string;
+  started_at: string;
+  phase?: string;
+  total?: number;
+  seq: number;
+  lines?: LogLine[];
+  installed?: InstalledPackage[];
+  done?: boolean;
+  status?: string;
+  error?: string;
+};
+
 export type ReportResponse = { commands?: Command[]; policy?: Policy };
 
 export const COMMAND_TYPES = [
   "agent.refresh",
+  "agent.update",
   "updates.check",
   "updates.apply",
   "host.reboot",

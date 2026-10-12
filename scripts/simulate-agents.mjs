@@ -173,10 +173,18 @@ class Host {
     if (cmd.type === "updates.check") return done(true, `${this.packages.length} updates available (${this.packages.filter((p) => p.security).length} security)`);
     if (cmd.type === "updates.apply") {
       const chosen = this.packages.filter((p) => (a.packages?.length ? a.packages.includes(p.name) : a.security_only ? p.security : true));
-      this.packages = this.packages.filter((p) => !chosen.includes(p));
-      if (chosen.some((p) => p.name.startsWith("kernel") || p.name.startsWith("linux-image") || p.source === "openssl")) this.reboot = true;
-      this.lastRun = { trigger: "command", started_at: iso(Date.now() - 40_000), finished_at: iso(), status: "success", packages: chosen.map((p) => p.name) };
-      return done(true, `upgraded ${chosen.length} package(s)\n${chosen.map((p) => `Setting up ${p.name} (${p.available}) ...`).join("\n")}`);
+      this.busy = true;
+      // Stream the run like the real agent, then report the result.
+      this.streamUpdate(cmd, chosen)
+        .catch((err) => console.warn(`${this.hostname}: progress stream failed: ${err.message}`))
+        .finally(() => {
+          this.packages = this.packages.filter((p) => !chosen.includes(p));
+          if (chosen.some((p) => p.name.startsWith("kernel") || p.name.startsWith("linux-image") || p.source === "openssl")) this.reboot = true;
+          this.lastRun = { trigger: "command", started_at: iso(Date.now() - 40_000), finished_at: iso(), status: "success", packages: chosen.map((p) => p.name) };
+          this.busy = false;
+          done(true, `upgraded ${chosen.length} package(s)`);
+        });
+      return;
     }
     if (cmd.type === "host.reboot") {
       if (!this.allowReboot) return done(false, "", "action disabled in agent config: actions.reboot");
@@ -190,6 +198,99 @@ class Host {
     done(false, "", `unknown command type "${cmd.type}"`);
   }
 }
+
+// ------------------------------------------------------------ live progress
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const rid = () => "run_" + Array.from({ length: 16 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
+
+/** Realistic package-manager output for a run, as [phase, stream, text, installed?] steps. */
+function script(h, chosen) {
+  const steps = [];
+  const agent = (phase, text) => steps.push([phase, "agent", text]);
+  const out = (phase, text, installed) => steps.push([phase, "stdout", text, installed]);
+  agent("preflight", "Pre-flight checks (minimum free disk 10%)");
+  agent("refreshing", `Refreshing ${h.manager} package lists`);
+  if (h.manager === "apt") {
+    const mirror = h.os_id === "debian" ? "http://deb.debian.org/debian" : "http://archive.ubuntu.com/ubuntu";
+    out("refreshing", `Hit:1 ${mirror} ${h.os_id === "debian" ? "bookworm" : "noble"} InRelease`);
+    out("refreshing", `Get:2 ${mirror} ${h.os_id === "debian" ? "bookworm-updates" : "noble-updates"} InRelease [126 kB]`);
+    out("refreshing", `Get:3 ${h.os_id === "debian" ? "http://security.debian.org/debian-security bookworm-security" : "http://security.ubuntu.com/ubuntu noble-security"} InRelease [126 kB]`);
+    out("refreshing", "Fetched 1,284 kB in 1s (1,107 kB/s)");
+    out("refreshing", "Reading package lists...");
+  } else if (h.manager === "dnf") {
+    out("refreshing", "Rocky Linux 9 - BaseOS                          1.9 MB/s | 2.3 MB     00:01");
+    out("refreshing", "Rocky Linux 9 - AppStream                       4.1 MB/s | 8.0 MB     00:01");
+    out("refreshing", "Metadata cache created.");
+  } else if (h.manager === "apk") {
+    out("refreshing", "fetch https://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64/APKINDEX.tar.gz");
+    out("refreshing", "fetch https://dl-cdn.alpinelinux.org/alpine/v3.20/community/x86_64/APKINDEX.tar.gz");
+  }
+  agent("installing", chosen.length ? `Installing ${chosen.length} package(s): ${chosen.map((p) => p.name).join(", ")}` : "Nothing to install");
+  if (h.manager === "apt" && chosen.length) {
+    out("installing", "Reading package lists...");
+    out("installing", "Building dependency tree...");
+    out("installing", "Reading state information...");
+    out("installing", "The following packages will be upgraded:");
+    out("installing", "  " + chosen.map((p) => p.name).join(" "));
+    out("installing", `${chosen.length} upgraded, 0 newly installed, 0 to remove and ${h.packages.length - chosen.length} not upgraded.`);
+    chosen.forEach((p, i) => out("installing", `Get:${i + 1} http://archive.ubuntu.com/ubuntu noble-updates/main amd64 ${p.name} amd64 ${p.available} [${(200 + i * 137) % 900} kB]`));
+    out("installing", "(Reading database ... 74512 files and directories currently installed.)");
+    for (const p of chosen) {
+      out("installing", `Preparing to unpack .../${p.name}_${p.available.replace(/^\d+:/, "")}_amd64.deb ...`);
+      out("installing", `Unpacking ${p.name} (${p.available}) over (${p.current}) ...`);
+    }
+    for (const p of chosen) out("installing", `Setting up ${p.name} (${p.available}) ...`, { name: p.name, version: p.available });
+    out("installing", "Processing triggers for man-db (2.12.0-4build2) ...");
+    out("installing", "Processing triggers for libc-bin (2.39-0ubuntu8.3) ...");
+  } else if (h.manager === "dnf" && chosen.length) {
+    out("installing", "Dependencies resolved.");
+    out("installing", "Transaction Summary");
+    out("installing", `Upgrade  ${chosen.length} Packages`);
+    out("installing", "Running transaction check");
+    out("installing", "Transaction test succeeded.");
+    out("installing", "Running transaction");
+    chosen.forEach((p, i) => out("installing", `  Upgrading        : ${p.name}-${p.available}.x86_64        ${i + 1}/${chosen.length * 2}`, { name: p.name, version: p.available }));
+    chosen.forEach((p, i) => out("installing", `  Cleanup          : ${p.name}-${p.current}.x86_64        ${chosen.length + i + 1}/${chosen.length * 2}`));
+    out("installing", "Complete!");
+  } else if (h.manager === "apk" && chosen.length) {
+    chosen.forEach((p, i) => out("installing", `(${i + 1}/${chosen.length}) Upgrading ${p.name} (${p.current} -> ${p.available})`, { name: p.name, version: p.available }));
+    out("installing", "OK: 12 MiB in 20 packages");
+  }
+  agent("verifying", "Checking remaining updates and whether a reboot is needed");
+  if (chosen.some((p) => p.name.startsWith("kernel") || p.source === "openssl")) agent("verifying", "A reboot is required to finish applying these updates");
+  agent("done", `Finished: ${chosen.length} package(s)`);
+  return steps;
+}
+
+Host.prototype.streamUpdate = async function (cmd, chosen) {
+  const creds = saved[this.hostname];
+  const base = { run_id: rid(), command_id: cmd.id, kind: "updates.apply", trigger: "command", started_at: iso() };
+  let seq = 0;
+  let phase = "preflight";
+  let queue = [];
+  let installed = [];
+  const flush = async (final) => {
+    const lines = queue;
+    const inst = installed;
+    queue = [];
+    installed = [];
+    await post("/api/agent/v1/progress", { ...base, phase, total: chosen.length, seq, lines, installed: inst, ...(final ? { done: true, status: "success" } : {}) }, creds);
+    seq += lines.length;
+  };
+  let lastFlush = Date.now();
+  for (const [ph, stream, text, inst] of script(this, chosen)) {
+    phase = ph;
+    queue.push({ t: iso(), s: stream, text });
+    if (inst) installed.push({ ...inst, t: iso() });
+    await sleep(stream === "agent" ? 600 : inst ? 900 : 180 + Math.random() * 250);
+    if (Date.now() - lastFlush >= 1000) {
+      await flush(false);
+      lastFlush = Date.now();
+    }
+  }
+  await flush(true);
+};
 
 const hosts = HOSTS.map((h) => new Host(h));
 

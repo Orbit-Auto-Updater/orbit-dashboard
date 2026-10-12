@@ -113,7 +113,7 @@ export function OverviewView() {
             <p className="font-semibold">No servers yet</p>
             <p className="text-sm text-muted">Install the agent on a Linux server to start monitoring it. It connects out to this dashboard; no inbound ports needed.</p>
           </div>
-          <Link href="/settings#enrolment">
+          <Link href="/agents#enrolment">
             <Button variant="primary" icon={Plus}>
               Add a server
             </Button>

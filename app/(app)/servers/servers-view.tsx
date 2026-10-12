@@ -28,7 +28,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LiveChart, RingGauge, Sparkline } from "@/components/charts";
 import { Modal, useConfirm, useToast } from "@/components/providers";
 import { Badge, Button, Card, CardHeader, cn, EmptyNote, EnvBadge, Field, IconButton, inputClass, MeterRow, PageHeader, Segmented, StatusBadge, StatusDot, Table, type Env } from "@/components/ui";
-import { ago, api, bytes, dateTime, duration, rate, useApi, useCommand, useMe } from "@/lib/client";
+import { ago, api, bytes, dateTime, duration, rate, useApi, useCommand, useMe, useStartUpdateJob } from "@/lib/client";
 import type { ServerSummary } from "@/lib/server/queries";
 
 type Filter = "all" | ServerSummary["status"];
@@ -64,7 +64,7 @@ export function ServersView() {
         description="Real-time resource usage and health for every enrolled host."
         actions={
           can("servers.manage") && (
-            <Link href="/settings#enrolment">
+            <Link href="/agents#enrolment">
               <Button variant="primary" icon={Plus}>
                 Add server
               </Button>
@@ -110,7 +110,7 @@ export function ServersView() {
         <p className="text-sm text-muted">Loading…</p>
       ) : servers.length === 0 ? (
         <EmptyNote>
-          No servers enrolled yet. {can("servers.manage") ? <Link className="text-primary-fg underline" href="/settings#enrolment">Create an enrolment token</Link> : "Ask an admin to add one"} and run the installer on a server.
+          No servers enrolled yet. {can("servers.manage") ? <Link className="text-primary-fg underline" href="/agents#enrolment">Create an enrolment token</Link> : "Ask an admin to add one"} and run the installer on a server.
         </EmptyNote>
       ) : visible.length === 0 ? (
         <EmptyNote>No servers match these filters.</EmptyNote>
@@ -269,6 +269,7 @@ function ServerDrawer({ id, onClose }: { id: string; onClose: () => void }) {
   const confirm = useConfirm();
   const run = useCommand();
   const { toast } = useToast();
+  const startJob = useStartUpdateJob();
   const [range, setRange] = useState<Range>("live");
   const [tab, setTab] = useState<"overview" | "updates" | "logs" | "activity">("overview");
   const [editing, setEditing] = useState(false);
@@ -294,7 +295,7 @@ function ServerDrawer({ id, onClose }: { id: string; onClose: () => void }) {
     if (!s) return;
     const n = securityOnly ? s.security : s.updates;
     if (await confirm({ title: `Install ${n} ${securityOnly ? "security " : ""}update${n === 1 ? "" : "s"} on ${s.name}?`, body: "Packages are upgraded non-interactively with the host's package manager. Pre-flight checks skip the run if disk space is low.", confirmLabel: "Install" }))
-      cmd("updates.apply", securityOnly ? { security_only: true } : {});
+      startJob({ serverIds: [id], securityOnly });
   }
 
   async function remove() {
@@ -352,12 +353,12 @@ function ServerDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                 </Button>
               )}
               {can("updates.run") && s!.updates > 0 && (
-                <Button size="sm" variant="primary" icon={PackageCheck} onClick={() => installUpdates(s!.security > 0)} disabled={offline}>
+                <Button size="sm" variant="primary" icon={PackageCheck} onClick={() => installUpdates(s!.security > 0)} disabled={offline || s!.agentActions?.updates === false} title={s!.agentActions?.updates === false ? "Installing updates is disabled in this server's agent config" : undefined}>
                   Install {s!.security > 0 ? `${s!.security} security` : s!.updates} update{(s!.security || s!.updates) === 1 ? "" : "s"}
                 </Button>
               )}
               {can("servers.reboot") && (
-                <Button size="sm" variant="danger" icon={Power} onClick={reboot} disabled={offline}>
+                <Button size="sm" variant="danger" icon={Power} onClick={reboot} disabled={offline || s!.agentActions?.reboot === false} title={s!.agentActions?.reboot === false ? "Reboots are disabled in this server's agent config (actions.reboot)" : undefined}>
                   Reboot
                 </Button>
               )}
@@ -394,7 +395,7 @@ function ServerDrawer({ id, onClose }: { id: string; onClose: () => void }) {
               ))}
 
               {tab === "overview" && <OverviewTab data={data} range={range} setRange={setRange} />}
-              {tab === "updates" && <UpdatesTab data={data} serverId={id} onInstall={installUpdates} reload={reload} />}
+              {tab === "updates" && <UpdatesTab data={data} serverId={id} onInstall={installUpdates} />}
               {tab === "logs" && <LogsTab logs={data.logs} />}
               {tab === "activity" && <ActivityTab data={data} />}
             </div>
@@ -460,9 +461,9 @@ function OverviewTab({ data, range, setRange }: { data: Detail; range: Range; se
   );
 }
 
-function UpdatesTab({ data, serverId, onInstall, reload }: { data: Detail; serverId: string; onInstall: (securityOnly: boolean) => void; reload: () => void }) {
+function UpdatesTab({ data, serverId, onInstall }: { data: Detail; serverId: string; onInstall: (securityOnly: boolean) => void }) {
   const { can } = useMe();
-  const run = useCommand();
+  const startJob = useStartUpdateJob();
   const u = data.updates;
   const pkgs = u?.packages ?? [];
   const sevTone = (sev: string) => (sev === "critical" ? "crit" : sev === "high" ? "warn" : sev === "medium" ? "info" : "neutral");
@@ -503,7 +504,7 @@ function UpdatesTab({ data, serverId, onInstall, reload }: { data: Detail; serve
                 </span>
                 {p.security && <Badge tone="warn" icon={ShieldAlert}>{p.advisory ?? "security"}</Badge>}
                 {can("updates.run") && (
-                  <Button size="sm" variant="ghost" onClick={() => run(serverId, "updates.apply", { packages: [p.name] }, reload)}>
+                  <Button size="sm" variant="ghost" onClick={() => startJob({ serverIds: [serverId], packages: [p.name] })}>
                     Install
                   </Button>
                 )}

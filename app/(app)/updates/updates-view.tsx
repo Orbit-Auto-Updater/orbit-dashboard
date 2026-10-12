@@ -1,10 +1,11 @@
 "use client";
 
 import { CalendarClock, Download, History, Pencil, Power, RefreshCw, ShieldAlert, ShieldCheck, Timer } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Modal, useConfirm, useToast } from "@/components/providers";
 import { Badge, Button, Card, CardHeader, cn, EmptyNote, EnvBadge, Field, inputClass, PageHeader, Segmented, StatusBadge, Table, Toggle, type Env } from "@/components/ui";
-import { ago, api, dateTime, useApi, useMe } from "@/lib/client";
+import { ago, api, dateTime, useApi, useMe, useStartUpdateJob } from "@/lib/client";
 
 type Policy = { id: string; name: string; environment: string; enabled: boolean; scope: "security" | "all"; days: string[]; start: string; duration_minutes: number; timezone: string; interval_hours: number; auto_reboot: boolean; exclude: string[]; servers: number };
 type Pkg = { name: string; available: string; current: string[]; security: boolean; advisory: string | null; manager: string; servers: { id: string; name: string; current: string }[] };
@@ -23,6 +24,7 @@ export function UpdatesView() {
   const { can } = useMe();
   const { toast } = useToast();
   const confirm = useConfirm();
+  const startJob = useStartUpdateJob();
   const { data, error, reload } = useApi<Data>("/api/updates", { interval: 15_000 });
   const [kind, setKind] = useState<"all" | "security" | "other">("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -34,7 +36,7 @@ export function UpdatesView() {
   const rows = data.packages.filter((p) => kind === "all" || (kind === "security" ? p.security : !p.security));
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.name));
 
-  async function bulk(path: "apply" | "check", body: Record<string, unknown>, what: string) {
+  async function bulk(path: "check", body: Record<string, unknown>, what: string) {
     try {
       const r = await api<{ queued: number }>(`/api/updates/${path}`, { body });
       toast({ title: what, body: `Sent to ${r.queued} server(s). Each agent picks it up on its next report; progress appears in the run history.`, tone: "success" });
@@ -47,14 +49,14 @@ export function UpdatesView() {
 
   async function applySecurity() {
     if (await confirm({ title: `Install ${data!.kpis.security} security updates?`, body: "Every server with pending security updates installs them now, regardless of its maintenance window.", confirmLabel: "Install now" }))
-      bulk("apply", { serverIds: "all", securityOnly: true }, "Security updates started");
+      startJob({ serverIds: "all", securityOnly: true });
   }
 
   async function applySelected() {
     const pkgs = [...selected];
     const servers = new Set(data!.packages.filter((p) => selected.has(p.name)).flatMap((p) => p.servers.map((s) => s.id)));
     if (await confirm({ title: `Install ${pkgs.length} package${pkgs.length === 1 ? "" : "s"} on ${servers.size} server${servers.size === 1 ? "" : "s"}?`, body: <span className="font-mono text-xs">{pkgs.slice(0, 12).join(", ")}{pkgs.length > 12 ? ` +${pkgs.length - 12}` : ""}</span>, confirmLabel: "Install" }))
-      bulk("apply", { serverIds: [...servers], packages: pkgs }, "Package install started");
+      startJob({ serverIds: [...servers], packages: pkgs });
   }
 
   async function savePolicy(p: Policy, patch: Partial<Policy>) {
@@ -242,7 +244,7 @@ export function UpdatesView() {
         </Card>
 
         <Card>
-          <CardHeader icon={History} title="Run history" />
+          <CardHeader icon={History} title="Run history" action={<Link href="/jobs" className="text-xs font-medium text-primary-fg hover:underline">Live jobs</Link>} />
           {data.runs.length === 0 ? (
             <EmptyNote>No update runs yet. They appear here when a policy window runs or you install updates.</EmptyNote>
           ) : (

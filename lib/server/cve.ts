@@ -162,13 +162,37 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>
 
 // --------------------------------------------------------------- scanning
 
+/**
+ * Keep only what the scanner uses. Full OSV records can be several MB (some
+ * kernel advisories enumerate thousands of affected versions).
+ */
+export function slimOsv(v: OsvVuln): OsvVuln {
+  const pick = (o?: { severity?: string; urgency?: string }) => (o && (o.severity || o.urgency) ? { severity: o.severity, urgency: o.urgency } : undefined);
+  return {
+    id: v.id,
+    summary: v.summary,
+    details: v.summary ? undefined : v.details?.slice(0, 500),
+    aliases: v.aliases,
+    upstream: v.upstream,
+    published: v.published,
+    severity: v.severity,
+    database_specific: v.database_specific?.severity ? { severity: v.database_specific.severity } : undefined,
+    affected: v.affected?.map((a) => ({
+      package: a.package ? { name: a.package.name, ecosystem: a.package.ecosystem } : undefined,
+      ranges: a.ranges?.map((r) => ({ type: r.type, events: r.events.filter((e) => e.fixed !== undefined || e.introduced !== undefined).slice(0, 20) })),
+      ecosystem_specific: pick(a.ecosystem_specific),
+      database_specific: a.database_specific?.severity ? { severity: a.database_specific.severity } : undefined,
+    })),
+  };
+}
+
 async function osvDetails(db: Kysely<DB>, id: string, f: Fetch): Promise<OsvVuln | null> {
   const cached = await db.selectFrom("osv_cache").selectAll().where("id", "=", id).executeTakeFirst();
   if (cached && Date.now() - cached.fetched_at < CACHE_MS) return JSON.parse(cached.data) as OsvVuln;
   const res = await f(`${OSV}/vulns/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(20_000) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`OSV ${res.status} for ${id}`);
-  const data = (await res.json()) as OsvVuln;
+  const data = slimOsv((await res.json()) as OsvVuln);
   await db
     .insertInto("osv_cache")
     .values({ id, data: JSON.stringify(data), fetched_at: Date.now() })

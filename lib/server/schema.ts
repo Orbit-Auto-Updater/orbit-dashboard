@@ -74,6 +74,7 @@ export interface ServersTable {
   apps_at: number | null;
   updates: string | null; // latest protocol UpdateStatus JSON
   updates_at: number | null;
+  agent_info: string | null; // protocol AgentInfo JSON
   packages_hash: string | null; // to detect when a CVE rescan is needed
   cve_scanned_at: number | null;
   cve_error: string | null;
@@ -202,6 +203,45 @@ export interface VulnerabilitiesTable {
   ignored_reason: string | null;
 }
 
+export type JobTargetStatus = "queued" | "running" | "succeeded" | "failed" | "skipped" | "expired";
+
+export interface JobsTable {
+  id: string;
+  kind: string; // "updates.apply"
+  label: string;
+  trigger: "manual" | "schedule";
+  args: string; // JSON: { packages?, security_only? }
+  created_by: string | null;
+  created_by_name: string;
+  created_at: number;
+}
+
+/** One server's part of a job. */
+export interface JobTargetsTable {
+  id: string;
+  job_id: string;
+  server_id: string;
+  command_id: string | null; // null for scheduled runs
+  run_id: string | null; // agent's run id, known once it starts streaming
+  status: JobTargetStatus;
+  phase: string;
+  total: number;
+  installed: string; // JSON [{ name, version, t }]
+  log_lines: number;
+  started_at: number | null;
+  finished_at: number | null;
+  error: string | null;
+  updated_at: number;
+}
+
+export interface JobLogsTable {
+  target_id: string;
+  seq: number;
+  ts: number;
+  stream: string;
+  text: string;
+}
+
 export interface OsvCacheTable { id: string; data: string; fetched_at: number }
 
 export interface AuditLogTable {
@@ -232,4 +272,7 @@ export interface DB {
   vulnerabilities: VulnerabilitiesTable;
   osv_cache: OsvCacheTable;
   audit_log: AuditLogTable;
+  jobs: JobsTable;
+  job_targets: JobTargetsTable;
+  job_logs: JobLogsTable;
 }

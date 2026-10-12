@@ -3,7 +3,9 @@
 import {
   Bell,
   Boxes,
+  Bot,
   LayoutDashboard,
+  ListChecks,
   LogOut,
   Menu,
   Moon,
@@ -21,13 +23,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useLive } from "@/components/providers";
 import { Avatar, cn, IconButton } from "@/components/ui";
 import { api, useApi, useMe } from "@/lib/client";
 import type { Permission } from "@/lib/permissions";
 
-type Counts = { openAlerts: number; criticalAlerts: number; seriousVulns: number; pendingUpdates: number };
+type Counts = { openAlerts: number; criticalAlerts: number; seriousVulns: number; pendingUpdates: number; runningJobs: number; outdatedAgents: number };
 type NavItem = { href: string; label: string; icon: LucideIcon; badge?: (c: Counts) => { value: number; tone: "crit" | "primary" } | null; perm?: Permission[] };
 
 const nav: { section: string; items: NavItem[] }[] = [
@@ -44,12 +46,14 @@ const nav: { section: string; items: NavItem[] }[] = [
     section: "Maintain",
     items: [
       { href: "/updates", label: "Updates", icon: PackageCheck, badge: (c) => (c.pendingUpdates ? { value: c.pendingUpdates, tone: "primary" } : null) },
+      { href: "/jobs", label: "Jobs", icon: ListChecks, badge: (c) => (c.runningJobs ? { value: c.runningJobs, tone: "primary" } : null) },
       { href: "/vulnerabilities", label: "Vulnerabilities", icon: ShieldAlert, badge: (c) => (c.seriousVulns ? { value: c.seriousVulns, tone: "crit" } : null) },
     ],
   },
   {
     section: "Administration",
     items: [
+      { href: "/agents", label: "Agents", icon: Bot, badge: (c) => (c.outdatedAgents ? { value: c.outdatedAgents, tone: "primary" } : null) },
       { href: "/users", label: "Users & roles", icon: UserCog, perm: ["users.manage"] },
       { href: "/settings", label: "Settings", icon: Settings, perm: ["org.settings", "servers.manage"] },
     ],
@@ -78,8 +82,24 @@ function Logo({ org }: { org: string }) {
   );
 }
 
-function SidebarContent({ counts, onNavigate }: { counts: Counts | null; onNavigate?: () => void }) {
-  const pathname = usePathname();
+/**
+ * usePathname needs a Suspense boundary on routes with dynamic segments
+ * (e.g. /jobs/[id]); the fallback renders the same sidebar without the
+ * active-page highlight so the shell still prerenders.
+ */
+function Sidebar(props: { counts: Counts | null; onNavigate?: () => void }) {
+  return (
+    <Suspense fallback={<SidebarContent {...props} pathname="" />}>
+      <SidebarWithPath {...props} />
+    </Suspense>
+  );
+}
+
+function SidebarWithPath(props: { counts: Counts | null; onNavigate?: () => void }) {
+  return <SidebarContent {...props} pathname={usePathname()} />;
+}
+
+function SidebarContent({ counts, onNavigate, pathname }: { counts: Counts | null; onNavigate?: () => void; pathname: string }) {
   const { me, orgName, can } = useMe();
   return (
     <div className="flex h-full flex-col gap-6 p-4">
@@ -189,7 +209,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh">
       <aside className="glass sticky top-0 hidden h-dvh w-64 shrink-0 rounded-none border-y-0 border-l-0 lg:block">
-        <SidebarContent counts={counts} />
+        <Sidebar counts={counts} />
       </aside>
 
       {open && (
@@ -197,7 +217,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
           <aside className="glass glass-strong absolute inset-y-0 left-0 w-72 rounded-none rounded-r-2xl">
             <IconButton icon={X} label="Close menu" className="absolute top-4 right-3" onClick={() => setOpen(false)} />
-            <SidebarContent counts={counts} onNavigate={() => setOpen(false)} />
+            <Sidebar counts={counts} onNavigate={() => setOpen(false)} />
           </aside>
         </div>
       )}

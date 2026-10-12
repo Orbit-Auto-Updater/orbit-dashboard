@@ -1,6 +1,9 @@
 /** Validation of dashboard-issued agent commands. */
+import type { Kysely } from "kysely";
 import { COMMAND_TYPES, type CommandType } from "./agent-protocol";
 import { badRequest, int } from "./api";
+import { newId } from "./crypto";
+import type { DB } from "./schema";
 
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_.@:-]{0,254}$/;
 const USER = /^[a-z_][a-z0-9_-]{0,31}$/;
@@ -42,8 +45,31 @@ export function validateCommand(type: unknown, raw: unknown): { type: CommandTyp
       const label = packages.length ? `Install ${packages.length === 1 ? packages[0] : `${packages.length} packages`}` : securityOnly ? "Install security updates" : "Install all updates";
       return { type: t, args, label };
     }
-    case "agent":
-      return { type: t, args: {}, label: "Refresh data" };
+    case "agent": {
+      if (action === "refresh") return { type: t, args: {}, label: "Refresh data" };
+      if (typeof a.version !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(a.version)) throw badRequest("Invalid agent version");
+      if (typeof a.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(a.sha256)) throw badRequest("Invalid checksum");
+      if (typeof a.path !== "string" || !/^\/downloads\/linux-dash-agent-linux-(amd64|arm64|arm|386)$/.test(a.path)) throw badRequest("Invalid download path");
+      return { type: t, args: { version: a.version, path: a.path, sha256: a.sha256 }, label: `Update agent to ${a.version}` };
+    }
   }
   throw badRequest("Unsupported command");
+}
+
+
+export async function queueCommand(
+  db: Kysely<DB>,
+  opts: { serverId: string; type: string; args: unknown; label: string; user: { id: string; name: string } | null; ttlMinutes?: number },
+) {
+  const now = Date.now();
+  const id = newId("cmd");
+  await db
+    .insertInto("commands")
+    .values({
+      id, server_id: opts.serverId, type: opts.type, args: JSON.stringify(opts.args ?? {}), status: "pending", label: opts.label.slice(0, 200),
+      created_by: opts.user?.id ?? null, created_by_name: opts.user?.name ?? "System", created_at: now,
+      expires_at: now + (opts.ttlMinutes ?? 15) * 60_000, delivered_at: null, finished_at: null, output: null, error: null,
+    })
+    .execute();
+  return id;
 }

@@ -1,7 +1,9 @@
 /** Read models for the dashboard pages. */
 import type { Kysely } from "kysely";
 import type { Apps, Metrics, UpdateStatus } from "./agent-protocol";
+import type { AgentInfo } from "./agent-protocol";
 import { osvEcosystem } from "./cve";
+import { agentRelease, compareVersions } from "./dist";
 import type { DB, ServersTable } from "./schema";
 import { getSettings } from "./settings";
 
@@ -130,6 +132,8 @@ function summarize(
     updatesError: u?.error ?? null,
     vulns: { critical: count("critical"), high: count("high"), total: v.reduce((a, x) => a + Number(x.n), 0) },
     cveSupported: osvEcosystem(s.os_id, s.os_version) !== null,
+    // What this server's agent config allows (null for agents that don't report it).
+    agentActions: parse<AgentInfo>(s.agent_info)?.actions ?? null,
     spark,
   };
 }
@@ -364,5 +368,66 @@ export async function vulnerabilitiesList(db: Kysely<DB>, includeFixed: boolean)
     lastScanAt: Number(s.cve_last_scan_at) || null,
     lastError: s.cve_last_error || null,
     enabled: s.cve_scan_enabled === "1",
+  };
+}
+
+// ------------------------------------------------------------------ agents
+
+export async function agentsOverview(db: Kysely<DB>, now = Date.now()) {
+  const release = agentRelease();
+  const [servers, updating] = await Promise.all([
+    db.selectFrom("servers").select(["id", "hostname", "display_name", "environment", "arch", "os_name", "agent_version", "agent_info", "last_seen_at", "enrolled_at"]).orderBy("hostname").execute(),
+    db
+      .selectFrom("job_targets")
+      .innerJoin("jobs", "jobs.id", "job_targets.job_id")
+      .select(["job_targets.server_id", "job_targets.job_id", "job_targets.phase"])
+      .where("jobs.kind", "=", "agent.update")
+      .where("job_targets.status", "in", ["queued", "running"])
+      .execute(),
+  ]);
+  const agents = servers.map((s) => {
+    const info = parse<AgentInfo>(s.agent_info);
+    const cmp = release?.version ? compareVersions(s.agent_version, release.version) : null;
+    const versionStatus: "current" | "outdated" | "newer" | "unknown" =
+      !release?.version || !s.agent_version ? "unknown" : s.agent_version === release.version ? "current" : cmp === 1 ? "newer" : "outdated";
+    const job = updating.find((u) => u.server_id === s.id);
+    const blocker = !info
+      ? "Predates self-update: re-run the installer once"
+      : !info.actions.agent_update
+        ? "Self-update is off in this server's config"
+        : !info.self_update
+          ? "Not running under systemd/OpenRC"
+          : release && !release.files[s.arch as keyof typeof release.files]
+            ? `No ${s.arch} build in this release`
+            : null;
+    return {
+      id: s.id,
+      name: s.display_name || s.hostname,
+      environment: s.environment,
+      arch: s.arch,
+      os: s.os_name,
+      version: s.agent_version,
+      versionStatus,
+      online: now - s.last_seen_at <= OFFLINE_AFTER_MS,
+      lastSeen: s.last_seen_at,
+      info,
+      updating: job ? { jobId: job.job_id, phase: job.phase } : null,
+      canUpdate: !blocker && versionStatus !== "current" && !job,
+      blocker,
+    };
+  });
+  return {
+    release: release && {
+      version: release.version,
+      builtAt: release.builtAt,
+      arches: Object.entries(release.files).map(([arch, f]) => ({ arch, sha256: f!.sha256, size: f!.size })),
+    },
+    agents,
+    counts: {
+      total: agents.length,
+      current: agents.filter((a) => a.versionStatus === "current").length,
+      outdated: agents.filter((a) => a.versionStatus === "outdated").length,
+      updatable: agents.filter((a) => a.canUpdate && a.versionStatus === "outdated").length,
+    },
   };
 }

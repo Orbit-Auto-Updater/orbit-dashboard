@@ -6,6 +6,7 @@ import zlib from "node:zlib";
 import type { Kysely } from "kysely";
 import type { Command, Policy, Report, ReportResponse } from "./agent-protocol";
 import { evaluateReport } from "./alerts";
+import { confirmAgentUpdates, expireTargets, finishFromCommand } from "./jobs";
 import { ApiError } from "./api";
 import { newId, randomToken, safeEqual, sha256 } from "./crypto";
 import type { DB, ServersTable, UpdatePoliciesTable } from "./schema";
@@ -73,7 +74,7 @@ export async function enroll(db: Kysely<DB>, body: unknown): Promise<{ agent_id:
     .values({
       id, secret_hash: sha256(secret), ...host, display_name: null, environment: token.environment, agent_version: clip(b.agent_version, 40),
       ssh_user: null, enrolled_at: now, last_seen_at: now, metrics: null, apps: null, apps_at: null, updates: null, updates_at: null,
-      packages_hash: null, cve_scanned_at: null, cve_error: null,
+      agent_info: null, packages_hash: null, cve_scanned_at: null, cve_error: null,
     })
     .execute();
   await db.updateTable("enrollment_tokens").set({ uses: token.uses + 1, last_used_at: now }).where("id", "=", token.id).execute();
@@ -110,6 +111,7 @@ export async function ingestReport(db: Kysely<DB>, server: ServersTable, body: u
   // Latest state on the server row.
   const patch: Partial<ServersTable> = { ...host, agent_version: clip(rep.agent_version, 40) || server.agent_version, last_seen_at: now };
   if (rep.metrics) patch.metrics = JSON.stringify(rep.metrics);
+  if (rep.agent && typeof rep.agent === "object") patch.agent_info = JSON.stringify(rep.agent).slice(0, 20_000);
   if (rep.apps) {
     patch.apps = JSON.stringify(rep.apps);
     patch.apps_at = now;
@@ -161,6 +163,7 @@ export async function ingestReport(db: Kysely<DB>, server: ServersTable, body: u
       .where("server_id", "=", server.id)
       .where("status", "in", ["pending", "delivered", "expired"]) // late results still count
       .execute();
+    if (r.type === "updates.apply" || r.type === "agent.update") await finishFromCommand(db, { id: r.id, type: r.type }, !!r.ok, clip(r.output, 20000) || null, clip(r.error, 2000) || null);
   }
 
   // Update run history.
@@ -179,9 +182,11 @@ export async function ingestReport(db: Kysely<DB>, server: ServersTable, body: u
   }
 
   await evaluateReport(db, { id: server.id, hostname: host.hostname }, rep);
+  await confirmAgentUpdates(db, server.id, clip(rep.agent_version, 40), rep.agent);
 
   // Commands to deliver: everything pending or delivered without a result yet.
   await db.updateTable("commands").set({ status: "expired" }).where("server_id", "=", server.id).where("status", "in", ["pending", "delivered"]).where("expires_at", "<", now).execute();
+  await expireTargets(db, now);
   const pending = await db
     .selectFrom("commands")
     .select(["id", "type", "args", "created_at"])
@@ -207,21 +212,4 @@ export async function ingestReport(db: Kysely<DB>, server: ServersTable, body: u
   return { response: { commands, policy: policyForAgent(policyRow) }, packagesChanged };
 }
 
-// ----------------------------------------------------------------- commands
-
-export async function queueCommand(
-  db: Kysely<DB>,
-  opts: { serverId: string; type: string; args: unknown; label: string; user: { id: string; name: string } | null; ttlMinutes?: number },
-) {
-  const now = Date.now();
-  const id = newId("cmd");
-  await db
-    .insertInto("commands")
-    .values({
-      id, server_id: opts.serverId, type: opts.type, args: JSON.stringify(opts.args ?? {}), status: "pending", label: opts.label.slice(0, 200),
-      created_by: opts.user?.id ?? null, created_by_name: opts.user?.name ?? "System", created_at: now,
-      expires_at: now + (opts.ttlMinutes ?? 15) * 60_000, delivered_at: null, finished_at: null, output: null, error: null,
-    })
-    .execute();
-  return id;
-}
+export { queueCommand } from "./commands";

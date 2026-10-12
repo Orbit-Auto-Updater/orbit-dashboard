@@ -7,6 +7,7 @@ import { checkOffline } from "./alerts";
 import { isSetupComplete } from "./config";
 import { scanAll } from "./cve";
 import { getDb } from "./db";
+import { expireTargets } from "./jobs";
 import { getSettings } from "./settings";
 
 const TICK_MS = 60_000;
@@ -27,6 +28,7 @@ export async function tick(now = Date.now()) {
 
   await checkOffline(db, now);
   await db.updateTable("commands").set({ status: "expired" }).where("status", "in", ["pending", "delivered"]).where("expires_at", "<", now).execute();
+  await expireTargets(db, now);
 
   const s = await getSettings(db);
   if (now - lastPrune > 3_600_000) {
@@ -38,6 +40,7 @@ export async function tick(now = Date.now()) {
     await db.deleteFrom("sessions").where("expires_at", "<", now).execute();
     await db.deleteFrom("alerts").where("status", "=", "resolved").where("resolved_at", "<", now - 90 * 86_400_000).execute();
     await db.deleteFrom("commands").where("created_at", "<", now - 90 * 86_400_000).execute();
+    await db.deleteFrom("jobs").where("created_at", "<", now - 90 * 86_400_000).execute(); // logs cascade
   }
 
   if (s.cve_scan_enabled === "1") {

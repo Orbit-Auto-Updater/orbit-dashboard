@@ -125,7 +125,7 @@ git pull                       # in both repositories
 docker compose --profile https up -d --build
 ```
 
-Database migrations run automatically when the new container starts. Rebuilding the image also refreshes the agent binaries served at `/downloads`. Existing agents keep running; reinstall them with the install command to upgrade, and the installer keeps their config.
+Database migrations run automatically when the new container starts. Rebuilding the image also refreshes the agent binaries served at `/downloads`; set `AGENT_VERSION` in `.env` so the dashboard knows which version it ships. Then open **Agents → Update outdated** to upgrade every server in one click. Agents older than 0.3.0 don't support self-update yet: re-run the install command on them once, and the installer keeps their config.
 
 ## Operations
 

@@ -4,7 +4,7 @@ import { ChevronDown, Download, ExternalLink, EyeOff, Info, RefreshCw, Search, S
 import { useState } from "react";
 import { Modal, useConfirm, useToast } from "@/components/providers";
 import { Badge, Button, Card, CardHeader, cn, EmptyNote, Field, inputClass, PageHeader, Segmented, Toggle, type Tone } from "@/components/ui";
-import { ago, api, useApi, useMe } from "@/lib/client";
+import { ago, api, useApi, useMe, useStartUpdateJob } from "@/lib/client";
 
 type Sev = "critical" | "high" | "medium" | "low" | "unknown";
 type Affected = { id: string; serverId: string; server: string; environment: string; installed: string; fixed: string | null; binaries: string; status: string; ignoredReason: string | null };
@@ -24,6 +24,7 @@ export function VulnerabilitiesView() {
   const { can } = useMe();
   const { toast } = useToast();
   const confirm = useConfirm();
+  const startJob = useStartUpdateJob();
   const [showFixed, setShowFixed] = useState(false);
   const [sev, setSev] = useState<"all" | Sev>("all");
   const [q, setQ] = useState("");
@@ -53,12 +54,7 @@ export function VulnerabilitiesView() {
     const targets = v.affected.filter((a) => a.status === "open");
     const packages = [...new Set(targets.flatMap((a) => a.binaries.split(", ")))].filter(Boolean);
     if (!(await confirm({ title: `Install the fix for ${v.vulnId}?`, body: <>Upgrades <span className="font-mono text-fg">{packages.join(", ")}</span> on {targets.length} server{targets.length === 1 ? "" : "s"} now.</>, confirmLabel: "Install fix" }))) return;
-    try {
-      const r = await api<{ queued: number }>("/api/updates/apply", { body: { serverIds: [...new Set(targets.map((a) => a.serverId))], packages } });
-      toast({ title: "Fix install started", body: `Sent to ${r.queued} server(s). The finding clears after the next scan once the package is updated.`, tone: "success" });
-    } catch (err) {
-      toast({ title: "Couldn't start install", body: (err as Error).message, tone: "error" });
-    }
+    await startJob({ serverIds: [...new Set(targets.map((a) => a.serverId))], packages });
   }
 
   async function setStatus(ids: string[], status: "ignored" | "open", reason = "") {
