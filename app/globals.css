@@ -1,26 +1,195 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------------------------------------------------------------------------
+   Design tokens. Dark is the default; light is opt-in via the theme toggle.
+   Chart series colours (--s1..--s3) are validated for CVD separation and
+   contrast against each mode's card surface.
+--------------------------------------------------------------------------- */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #050918;
+  --bg-glow-1: rgba(124, 58, 237, 0.22);
+  --bg-glow-2: rgba(37, 99, 235, 0.18);
+  --bg-glow-3: rgba(14, 165, 233, 0.08);
+
+  --glass: rgba(22, 30, 68, 0.48);
+  --glass-strong: rgba(26, 34, 78, 0.78);
+  --glass-hover: rgba(34, 44, 96, 0.55);
+  --line: rgba(148, 163, 255, 0.1);
+  --line-strong: rgba(148, 163, 255, 0.18);
+  --inset: rgba(8, 12, 32, 0.55);
+
+  --fg: #e8eaf8;
+  --muted: #a1a8cc;
+  --subtle: #6c7399;
+
+  --primary: #8b5cf6;
+  --primary-fg: #c4b5fd;
+  --primary-soft: rgba(139, 92, 246, 0.16);
+  --primary-ring: rgba(139, 92, 246, 0.45);
+
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --crit: #f87171;
+  --info: #60a5fa;
+
+  --s1: #9b7cf4;
+  --s2: #18a6bd;
+  --s3: #d27733;
+  --grid: rgba(148, 163, 255, 0.08);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eceffb;
+  --bg-glow-1: rgba(139, 92, 246, 0.18);
+  --bg-glow-2: rgba(59, 130, 246, 0.14);
+  --bg-glow-3: rgba(14, 165, 233, 0.08);
+
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(255, 255, 255, 0.9);
+  --glass-hover: rgba(255, 255, 255, 0.8);
+  --line: rgba(30, 36, 90, 0.09);
+  --line-strong: rgba(30, 36, 90, 0.16);
+  --inset: rgba(236, 239, 251, 0.7);
+
+  --fg: #12152e;
+  --muted: #4a5072;
+  --subtle: #7a809f;
+
+  --primary: #7c3aed;
+  --primary-fg: #6d28d9;
+  --primary-soft: rgba(124, 58, 237, 0.1);
+  --primary-ring: rgba(124, 58, 237, 0.35);
+
+  --ok: #059669;
+  --warn: #b45309;
+  --crit: #dc2626;
+  --info: #2563eb;
+
+  --s1: #7c5cf0;
+  --s2: #0e9fb6;
+  --s3: #d0701f;
+  --grid: rgba(30, 36, 90, 0.07);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-glass: var(--glass);
+  --color-glass-strong: var(--glass-strong);
+  --color-glass-hover: var(--glass-hover);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-inset: var(--inset);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-crit: var(--crit);
+  --color-info: var(--info);
+  --color-s1: var(--s1);
+  --color-s2: var(--s2);
+  --color-s3: var(--s3);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(60rem 40rem at 85% -10%, var(--bg-glow-1), transparent 60%),
+    radial-gradient(50rem 36rem at -10% 20%, var(--bg-glow-2), transparent 60%),
+    radial-gradient(40rem 30rem at 50% 110%, var(--bg-glow-3), transparent 60%);
+  background-attachment: fixed;
+  color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+}
+
+@layer components {
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
+      0 10px 30px -12px rgba(2, 6, 23, 0.45);
+  }
+  :root[data-theme="light"] .glass {
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.8),
+      0 10px 30px -16px rgba(30, 36, 90, 0.2);
+  }
+  .glass-strong {
+    background: var(--glass-strong);
+    border: 1px solid var(--line-strong);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+}
+
+/* Live charts slide one step left over each tick for a smooth stream. */
+@keyframes chart-slide {
+  from {
+    transform: translateX(var(--chart-step));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 1;
+  }
+  80%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+    opacity: 1;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.live-dot {
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
