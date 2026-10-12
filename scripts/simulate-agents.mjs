@@ -113,6 +113,7 @@ class Host {
     this.lastRun = undefined;
     this.reboot = false;
     this.reports = 0;
+    this.version = "0.2.0";
     this.downUntil = 0;
   }
 
@@ -123,7 +124,7 @@ class Host {
     this.tx = walk(this.tx, this.txBase ?? (this.txBase = this.tx), this.tx * 0.2, 0, 1e10);
     const memTotal = this.mem * GB;
     const rep = {
-      agent_version: "0.1.0-sim",
+      agent_version: this.version,
       sent_at: iso(),
       host: { hostname: this.hostname, os_name: this.os_name, os_id: this.os_id, os_version: this.os_version, kernel: this.kernel, arch: "amd64", cpu_cores: this.cores, mem_total_bytes: memTotal, boot_time: iso(this.boot), ips: [this.ip], package_manager: this.manager },
       metrics: {
@@ -142,6 +143,12 @@ class Host {
       updates: { manager: this.manager, checked_at: iso(Date.now() - 3600_000), packages: this.packages, reboot_required: this.reboot, running: false, last_run: this.lastRun },
       logs: Math.random() < 0.3 ? [{ time: iso(), priority: 3, unit: this.units.find((u) => u.state === "failed")?.name ?? "kernel", message: ["Failed to start service: exit-code", "EXT4-fs warning: ext4_dx_add_entry: Directory index full!", "Out of memory: Killed process 3121 (node)"][Math.floor(Math.random() * 3)] }] : [],
       results: this.results.splice(0),
+      agent: {
+        version: this.version, report_interval_seconds: INTERVAL / 1000, supervisor: "systemd", self_update: true, package_manager: this.manager,
+        actions: { updates: true, reboot: this.allowReboot, docker: true, pm2: true, systemd: true, agent_update: true },
+        features: { updates: true, docker: this.containers.length > 0, pm2: this.pm2.length > 0, systemd: this.units.length > 0, journal: true },
+        config_path: "/etc/linux-dash-agent/config.yaml",
+      },
     };
     if (!rep.apps.docker && !rep.apps.pm2 && !rep.apps.systemd) delete rep.apps;
     return rep;
@@ -195,6 +202,17 @@ class Host {
       return;
     }
     if (cmd.type === "agent.refresh") return done(true, "collection triggered");
+    if (cmd.type === "agent.update") {
+      // Like the real agent: download, verify, swap, restart, then report in on the new version.
+      this.streamAgentUpdate(cmd, a)
+        .catch((err) => console.warn(`${this.hostname}: progress stream failed: ${err.message}`))
+        .finally(() => {
+          done(true, `installed ${a.version}; restarting`);
+          this.downUntil = Date.now() + 4000;
+          setTimeout(() => (this.version = a.version), 3000);
+        });
+      return;
+    }
     done(false, "", `unknown command type "${cmd.type}"`);
   }
 }
@@ -292,6 +310,28 @@ Host.prototype.streamUpdate = async function (cmd, chosen) {
   await flush(true);
 };
 
+Host.prototype.streamAgentUpdate = async function (cmd, a) {
+  const creds = saved[this.hostname];
+  const base = { run_id: rid(), command_id: cmd.id, kind: "agent.update", trigger: "command", started_at: iso() };
+  const steps = [
+    ["downloading", `Updating agent ${this.version} → ${a.version} (/usr/local/bin/linux-dash-agent)`],
+    ["downloading", `Downloading ${a.path}`],
+    ["downloading", "Downloaded 7.3 MB"],
+    ["verifying", `SHA-256 matches ${a.sha256.slice(0, 16)}…`],
+    ["verifying", `New binary runs and reports version ${a.version}`],
+    ["verifying", "New version accepts /etc/linux-dash-agent/config.yaml"],
+    ["installing", "Installed; previous version kept at /usr/local/bin/linux-dash-agent.previous"],
+    ["restarting", `Restarting via systemd. The update is confirmed when ${a.version} reports in; it rolls back automatically if it can't.`],
+  ];
+  let seq = 0;
+  for (const [phase, text] of steps) {
+    await sleep(500);
+    await post("/api/agent/v1/progress", { ...base, phase, seq, lines: [{ t: iso(), s: "agent", text }] }, creds);
+    seq++;
+  }
+  await post("/api/agent/v1/progress", { ...base, phase: "restarting", seq, done: true, status: "success" }, creds);
+};
+
 const hosts = HOSTS.map((h) => new Host(h));
 
 async function tick(h) {
@@ -299,7 +339,7 @@ async function tick(h) {
   if (Date.now() < h.downUntil) return;
   try {
     if (!saved[h.hostname]) {
-      saved[h.hostname] = await post("/api/agent/v1/enroll", { token: TOKEN, agent_version: "0.1.0-sim", host: h.report().host });
+      saved[h.hostname] = await post("/api/agent/v1/enroll", { token: TOKEN, agent_version: h.version, host: h.report().host });
       fs.writeFileSync(STATE, JSON.stringify(saved, null, 2));
       console.log(`enrolled ${h.hostname} as ${saved[h.hostname].agent_id}`);
     }
