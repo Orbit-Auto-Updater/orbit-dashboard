@@ -1,4 +1,4 @@
-# HTTPS reverse proxy for Linux Dash (used by `docker compose --profile https`).
+# HTTPS reverse proxy for Orbit (used by `docker compose --profile https`).
 # With a public DNS name Caddy obtains a Let's Encrypt certificate automatically.
 # For an internal-only name or IP, replace the email line with `tls internal`
 # and give agents Caddy's root CA (installer: --ca-file).

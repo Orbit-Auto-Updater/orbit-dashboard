@@ -41,7 +41,7 @@ export function Enrolment() {
           Install command: <code className="font-mono text-fg">curl -fsSL {data?.publicUrl ?? "…"}/install.sh | sudo sh -s -- --token &lt;TOKEN&gt;</code>
         </p>
         <p className="mt-1 text-subtle">
-          The installer asks for anything else (what to monitor, reboots, auto-updates). Agent binaries are served from <code className="font-mono">/downloads</code>; build them with <code className="font-mono">make release</code> in linux-dash-agent and copy <code className="font-mono">dist/</code> to the dashboard&apos;s data/agent directory (or set AGENT_DIST_DIR).
+          The installer asks for anything else (what to monitor, reboots, auto-updates). Agent binaries are served from <code className="font-mono">/downloads</code>; build them with <code className="font-mono">make release</code> in the agent repo and copy <code className="font-mono">dist/</code> to the dashboard&apos;s data/agent directory (or set AGENT_DIST_DIR).
         </p>
       </div>
       {!data ? (

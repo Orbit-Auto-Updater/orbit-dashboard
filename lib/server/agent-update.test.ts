@@ -13,7 +13,7 @@ import { agentsOverview } from "./queries";
 import { ENGINES, testDb } from "./testing";
 
 const dist = fs.mkdtempSync(path.join(os.tmpdir(), "ld-dist-"));
-fs.writeFileSync(path.join(dist, "linux-dash-agent-linux-amd64"), "new agent binary");
+fs.writeFileSync(path.join(dist, "orbit-agent-linux-amd64"), "new agent binary");
 fs.writeFileSync(path.join(dist, "VERSION"), "0.3.0\n");
 process.env.AGENT_DIST_DIR = dist;
 const binarySha = crypto.createHash("sha256").update("new agent binary").digest("hex");
@@ -58,7 +58,7 @@ for (const engine of ENGINES) {
       // The agent receives the checksum of the exact file it will download.
       const delivered = await a.report("0.2.0", info());
       const cmd = delivered.response.commands!.find((c) => c.type === "agent.update")!;
-      assert.deepEqual(cmd.args, { version: "0.3.0", path: "/downloads/linux-dash-agent-linux-amd64", sha256: binarySha });
+      assert.deepEqual(cmd.args, { version: "0.3.0", path: "/downloads/orbit-agent-linux-amd64", sha256: binarySha });
 
       // "Installed; restarting" doesn't finish the job...
       await a.report("0.2.0", info(), [{ id: cmd.id, type: "agent.update", ok: true, output: "installed 0.3.0; restarting", started_at: "", finished_at: "" }]);

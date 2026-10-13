@@ -11,7 +11,7 @@ import { randomToken, sha256 } from "./crypto";
 import { getDb } from "./db";
 import type { DB } from "./schema";
 
-export const SESSION_COOKIE = "ld_session";
+export const SESSION_COOKIE = "orbit_session";
 const SESSION_DAYS = 30;
 const TOUCH_EVERY_MS = 5 * 60_000;
 

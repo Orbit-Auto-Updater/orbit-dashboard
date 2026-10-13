@@ -49,7 +49,7 @@ export function validateCommand(type: unknown, raw: unknown): { type: CommandTyp
       if (action === "refresh") return { type: t, args: {}, label: "Refresh data" };
       if (typeof a.version !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(a.version)) throw badRequest("Invalid agent version");
       if (typeof a.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(a.sha256)) throw badRequest("Invalid checksum");
-      if (typeof a.path !== "string" || !/^\/downloads\/linux-dash-agent-linux-(amd64|arm64|arm|386)$/.test(a.path)) throw badRequest("Invalid download path");
+      if (typeof a.path !== "string" || !/^\/downloads\/orbit-agent-linux-(amd64|arm64|arm|386)$/.test(a.path)) throw badRequest("Invalid download path");
       return { type: t, args: { version: a.version, path: a.path, sha256: a.sha256 }, label: `Update agent to ${a.version}` };
     }
   }

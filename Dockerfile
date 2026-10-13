@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1.7
 #
-# Linux Dash dashboard: production image.
+# Orbit dashboard: production image.
 #
 # The agent's source is passed as a named build context so the image can serve
 # the installer and agent binaries (/install.sh, /downloads/*) itself:
 #
-#   docker build --build-context agent=../linux-dash-agent -t linux-dash .
+#   docker build --build-context agent=../orbit-agent -t orbit .
 #
 # (docker compose does this for you; see compose.yaml.)
 
@@ -26,11 +26,11 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     for arch in amd64 arm64 arm 386; do \
       CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath \
         -ldflags "-s -w -X main.version=${AGENT_VERSION}" \
-        -o /dist/linux-dash-agent-linux-$arch ./cmd/linux-dash-agent; \
+        -o /dist/orbit-agent-linux-$arch ./cmd/orbit-agent; \
     done; \
     cp deploy/install.sh /dist/install.sh; \
     echo "${AGENT_VERSION}" > /dist/VERSION; \
-    cd /dist && sha256sum linux-dash-agent-linux-* > SHA256SUMS
+    cd /dist && sha256sum orbit-agent-linux-* > SHA256SUMS
 
 # ----------------------------------------------------------------- deps ---
 FROM node:${NODE_VERSION}-alpine AS deps
@@ -50,10 +50,10 @@ RUN pnpm build
 FROM node:${NODE_VERSION}-alpine AS runtime
 
 RUN apk add --no-cache tini \
- && addgroup -S -g 10001 linuxdash \
- && adduser -S -D -H -u 10001 -G linuxdash linuxdash \
+ && addgroup -S -g 10001 orbit \
+ && adduser -S -D -H -u 10001 -G orbit orbit \
  && mkdir -p /data /app/.next/cache \
- && chown linuxdash:linuxdash /data /app/.next/cache \
+ && chown orbit:orbit /data /app/.next/cache \
  && chmod 0700 /data
 
 WORKDIR /app
@@ -62,7 +62,7 @@ ENV NODE_ENV=production \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
     HOSTNAME=0.0.0.0 \
     PORT=3000 \
-    LINUX_DASH_DATA_DIR=/data \
+    ORBIT_DATA_DIR=/data \
     AGENT_DIST_DIR=/app/agent-dist
 
 # Application files are owned by root and read-only to the app user; only
@@ -73,7 +73,7 @@ COPY --from=build /app/public ./public
 COPY --from=build /app/scripts/backup-sqlite.mjs ./scripts/backup-sqlite.mjs
 COPY --from=agent-build /dist ./agent-dist
 
-USER linuxdash
+USER orbit
 VOLUME ["/data"]
 EXPOSE 3000
 
@@ -84,5 +84,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "server.js"]
 
-LABEL org.opencontainers.image.title="Linux Dash" \
+LABEL org.opencontainers.image.title="Orbit" \
       org.opencontainers.image.description="Fleet monitoring, patching and CVE alerts for Linux servers"

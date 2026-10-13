@@ -16,8 +16,8 @@ const arg = (name, def) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 ? process.argv[i + 1] : def;
 };
-const SERVER = arg("server", process.env.LINUX_DASH_SERVER ?? "http://localhost:3000").replace(/\/$/, "");
-const TOKEN = arg("token", process.env.LINUX_DASH_TOKEN);
+const SERVER = arg("server", process.env.ORBIT_SERVER ?? "http://localhost:3000").replace(/\/$/, "");
+const TOKEN = arg("token", process.env.ORBIT_TOKEN);
 const INTERVAL = Number(arg("interval", "10")) * 1000;
 const STATE = arg("state", ".simulated-agents.json");
 if (!TOKEN) {
@@ -92,7 +92,7 @@ try {
 async function post(path, body, creds) {
   const res = await fetch(SERVER + path, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Content-Encoding": "gzip", "User-Agent": "linux-dash-agent/sim", "X-Agent-Protocol": "1", ...(creds ? { "X-Agent-ID": creds.agent_id, Authorization: `Bearer ${creds.secret}` } : {}) },
+    headers: { "Content-Type": "application/json", "Content-Encoding": "gzip", "User-Agent": "orbit-agent/sim", "X-Agent-Protocol": "1", ...(creds ? { "X-Agent-ID": creds.agent_id, Authorization: `Bearer ${creds.secret}` } : {}) },
     body: zlib.gzipSync(JSON.stringify(body)),
   });
   const text = await res.text();
@@ -147,7 +147,7 @@ class Host {
         version: this.version, report_interval_seconds: INTERVAL / 1000, supervisor: "systemd", self_update: true, package_manager: this.manager,
         actions: { updates: true, reboot: this.allowReboot, docker: true, pm2: true, systemd: true, agent_update: true },
         features: { updates: true, docker: this.containers.length > 0, pm2: this.pm2.length > 0, systemd: this.units.length > 0, journal: true },
-        config_path: "/etc/linux-dash-agent/config.yaml",
+        config_path: "/etc/orbit-agent/config.yaml",
       },
     };
     if (!rep.apps.docker && !rep.apps.pm2 && !rep.apps.systemd) delete rep.apps;
@@ -314,13 +314,13 @@ Host.prototype.streamAgentUpdate = async function (cmd, a) {
   const creds = saved[this.hostname];
   const base = { run_id: rid(), command_id: cmd.id, kind: "agent.update", trigger: "command", started_at: iso() };
   const steps = [
-    ["downloading", `Updating agent ${this.version} → ${a.version} (/usr/local/bin/linux-dash-agent)`],
+    ["downloading", `Updating agent ${this.version} → ${a.version} (/usr/local/bin/orbit-agent)`],
     ["downloading", `Downloading ${a.path}`],
     ["downloading", "Downloaded 7.3 MB"],
     ["verifying", `SHA-256 matches ${a.sha256.slice(0, 16)}…`],
     ["verifying", `New binary runs and reports version ${a.version}`],
-    ["verifying", "New version accepts /etc/linux-dash-agent/config.yaml"],
-    ["installing", "Installed; previous version kept at /usr/local/bin/linux-dash-agent.previous"],
+    ["verifying", "New version accepts /etc/orbit-agent/config.yaml"],
+    ["installing", "Installed; previous version kept at /usr/local/bin/orbit-agent.previous"],
     ["restarting", `Restarting via systemd. The update is confirmed when ${a.version} reports in; it rolls back automatically if it can't.`],
   ];
   let seq = 0;

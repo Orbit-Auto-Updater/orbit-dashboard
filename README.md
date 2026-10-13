@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/logo.svg" width="88" alt="Linux Dash logo">
+<img src="docs/logo.svg" width="88" alt="Orbit logo">
 
-# Linux Dash
+# Orbit
 
 **Monitor, patch and secure your Linux fleet from one dashboard.**
 
@@ -14,7 +14,7 @@ Live metrics for every server and the apps on it, one-click package updates with
 [![SQLite](https://img.shields.io/badge/SQLite-built--in-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://nodejs.org/api/sqlite.html)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)](DEPLOY.md)
 
-[Quick start](#-quick-start) · [Adding servers](#-adding-servers) · [Network & firewall](#-network--firewall) · [Deploy guide](DEPLOY.md) · [Agent](../linux-dash-agent)
+[Quick start](#-quick-start) · [Adding servers](#-adding-servers) · [Network & firewall](#-network--firewall) · [Deploy guide](DEPLOY.md) · [Agent](https://github.com/Orbit-Auto-Updater/orbit-agent)
 
 <br>
 
@@ -135,9 +135,9 @@ Open the dashboard. The first visit goes to the setup wizard:
 
 | Variable | Purpose |
 | --- | --- |
-| `LINUX_DASH_DATA_DIR` | Where `config.json`, the setup code and the default SQLite file live. Default `./data`. Keep it on persistent storage. |
+| `ORBIT_DATA_DIR` | Where `config.json`, the setup code and the default SQLite file live. Default `./data`. Keep it on persistent storage. |
 | `DATABASE_URL` | Overrides the wizard's database choice: `postgres://user:pass@host/db?sslmode=require` or `sqlite:/path/to/file.db`. Tables are created on first start. `DATABASE_URL_FILE` reads it from a file (Docker secrets). |
-| `AGENT_DIST_DIR` | Where agent release files are served from (`/install.sh`, `/downloads/…`). Default `data/agent`, falling back to `../linux-dash-agent/dist`. |
+| `AGENT_DIST_DIR` | Where agent release files are served from (`/install.sh`, `/downloads/…`). Default `data/agent`, falling back to `../orbit-agent/dist`. |
 
 > [!IMPORTANT]
 > Put the dashboard behind HTTPS (a reverse proxy such as Caddy or nginx) in production. Session cookies are marked `Secure` when the request is HTTPS (`X-Forwarded-Proto` is honoured).
@@ -147,13 +147,13 @@ Open the dashboard. The first visit goes to the setup wizard:
 ```mermaid
 flowchart LR
     subgraph fleet["Your servers"]
-        A1["linux-dash-agent"]
-        A2["linux-dash-agent"]
-        A3["linux-dash-agent"]
+        A1["orbit-agent"]
+        A2["orbit-agent"]
+        A3["orbit-agent"]
     end
     subgraph dash["Dashboard host"]
         P["Caddy / reverse proxy<br/>:443"]
-        D["Linux Dash<br/>Next.js"]
+        D["Orbit<br/>Next.js"]
         DB[("PostgreSQL<br/>or SQLite")]
     end
     U(["Browser"])
@@ -173,8 +173,8 @@ Every agent reports about every 10 seconds. The response carries any queued comm
 **1. Give the dashboard the agent release.** The Docker image already includes it. When running from source, build it once:
 
 ```bash
-cd ../linux-dash-agent && make release VERSION=0.3.0
-cp -r dist ../linux-dash/data/agent
+cd ../orbit-agent && make release VERSION=0.3.0
+cp -r dist ../orbit-dashboard/data/agent
 ```
 
 **2. Create an enrolment token** on the **Agents** page. Tokens choose the server's environment, which decides its update policy. They can expire or be limited to a number of servers.
@@ -240,7 +240,7 @@ SSH is unchanged: the server's **SSH** shortcut just copies `ssh user@host` for 
 sudo ufw allow 443/tcp
 sudo ufw allow 80/tcp          # only for Let's Encrypt
 
-# Monitored servers: nothing to open for Linux Dash.
+# Monitored servers: nothing to open for Orbit.
 # With an outbound allow-list, permit the dashboard:
 sudo ufw allow out to <dashboard-ip> port 443 proto tcp
 ```

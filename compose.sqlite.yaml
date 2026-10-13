@@ -1,22 +1,22 @@
-# Linux Dash: single container with SQLite (small fleets, quick start).
+# Orbit: single container with SQLite (small fleets, quick start).
 #
 #   docker compose -f compose.sqlite.yaml up -d
 #   docker compose -f compose.sqlite.yaml logs dashboard | grep "setup code"
 #
-# In the setup wizard choose SQLite and keep the default path (/data/linux-dash.db).
+# In the setup wizard choose SQLite and keep the default path (/data/orbit.db).
 # Put HTTPS in front before exposing it beyond localhost (see DEPLOY.md).
 
-name: linux-dash
+name: orbit
 
 services:
   dashboard:
     build:
       context: .
       additional_contexts:
-        agent: ../linux-dash-agent
+        agent: ../orbit-agent
       args:
         AGENT_VERSION: ${AGENT_VERSION:-dev}
-    image: ${DASHBOARD_IMAGE:-linux-dash:latest}
+    image: ${DASHBOARD_IMAGE:-orbit:latest}
     restart: unless-stopped
     environment:
       TZ: ${TZ:-UTC}

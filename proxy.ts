@@ -6,7 +6,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isSetupComplete } from "@/lib/server/config";
 
-const SESSION_COOKIE = "ld_session";
+const SESSION_COOKIE = "orbit_session";
 const PUBLIC = [/^\/login$/, /^\/invite\//, /^\/api\/auth\//, /^\/api\/invite\//, /^\/api\/agent\//, /^\/install\.sh$/, /^\/downloads\//];
 
 export function proxy(req: NextRequest) {

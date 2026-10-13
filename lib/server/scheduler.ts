@@ -11,15 +11,15 @@ import { expireTargets } from "./jobs";
 import { getSettings } from "./settings";
 
 const TICK_MS = 60_000;
-const g = globalThis as unknown as { __linuxDashScheduler?: NodeJS.Timeout };
+const g = globalThis as unknown as { __orbitScheduler?: NodeJS.Timeout };
 let lastPrune = 0;
 
 export function startScheduler() {
-  if (g.__linuxDashScheduler) return;
-  g.__linuxDashScheduler = setInterval(() => {
+  if (g.__orbitScheduler) return;
+  g.__orbitScheduler = setInterval(() => {
     tick().catch((err) => console.warn("[scheduler]", (err as Error).message));
   }, TICK_MS);
-  g.__linuxDashScheduler.unref?.();
+  g.__orbitScheduler.unref?.();
 }
 
 export async function tick(now = Date.now()) {

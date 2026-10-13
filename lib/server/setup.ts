@@ -40,4 +40,4 @@ export function describeDb(cfg: DbConfig) {
   }
 }
 
-export const defaultSqlitePath = () => path.join(dataDir(), "linux-dash.db");
+export const defaultSqlitePath = () => path.join(dataDir(), "orbit.db");

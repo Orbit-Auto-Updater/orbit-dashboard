@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Linux Dash", template: "%s · Linux Dash" },
+  title: { default: "Orbit", template: "%s · Orbit" },
   description: "Monitor Linux servers and applications, and automate package updates.",
 };
 

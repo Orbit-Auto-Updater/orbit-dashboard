@@ -96,7 +96,7 @@ export function AgentsView() {
         <Card className="lg:col-span-1">
           <CardHeader icon={Package} title="Version this dashboard ships" subtitle={r ? `Built ${dateTime(r.builtAt)}` : undefined} />
           {!r ? (
-            <p className="text-sm text-warn">No agent binaries found. Run <code className="font-mono text-xs">make release VERSION=x.y.z</code> in linux-dash-agent (or rebuild the Docker image), then refresh.</p>
+            <p className="text-sm text-warn">No agent binaries found. Run <code className="font-mono text-xs">make release VERSION=x.y.z</code> in the agent repo (or rebuild the Docker image), then refresh.</p>
           ) : (
             <>
               <p className="tabular text-3xl font-semibold tracking-tight">{r.version ?? <span className="text-warn">unversioned</span>}</p>
@@ -277,9 +277,9 @@ function AgentDetails({ a }: { a: Agent }) {
           The config lives on the server and the dashboard can&apos;t change it, by design: the server decides what the dashboard may do. Edit it, check it, and restart:
         </p>
         <pre className="mt-2 overflow-x-auto rounded bg-[#05070f] p-2 font-mono text-[11px] text-slate-300">
-          {`sudo nano ${i.config_path || "/etc/linux-dash-agent/config.yaml"}
-sudo linux-dash-agent validate
-sudo systemctl restart linux-dash-agent`}
+          {`sudo nano ${i.config_path || "/etc/orbit-agent/config.yaml"}
+sudo orbit-agent validate
+sudo systemctl restart orbit-agent`}
         </pre>
       </div>
     </div>

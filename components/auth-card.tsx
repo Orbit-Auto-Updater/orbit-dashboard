@@ -12,7 +12,7 @@ export function AuthCard({ title, subtitle, children, wide }: { title: string; s
               <path d="M12 19h8" />
             </svg>
           </span>
-          <span className="text-lg font-semibold tracking-tight">Linux Dash</span>
+          <span className="text-lg font-semibold tracking-tight">Orbit</span>
         </div>
         <section className="glass p-6 sm:p-8">
           <h1 className="text-xl font-semibold tracking-tight">{title}</h1>

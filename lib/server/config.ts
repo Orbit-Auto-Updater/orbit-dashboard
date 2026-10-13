@@ -3,7 +3,7 @@
  * first-time setup has finished). Everything else lives in the database.
  *
  * DATABASE_URL, when set, overrides the stored database connection:
- *   postgres://user:pass@host:5432/db   or   sqlite:/var/lib/linux-dash/dash.db
+ *   postgres://user:pass@host:5432/db   or   sqlite:/var/lib/orbit/orbit.db
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -21,7 +21,7 @@ export type AppConfig = {
 export function dataDir() {
   // turbopackIgnore: this is a runtime location, not a build input; without it
   // the file tracer copies the whole project (including data/) into the bundle.
-  return path.resolve(/*turbopackIgnore: true*/ process.env.LINUX_DASH_DATA_DIR || path.join(process.cwd(), "data"));
+  return path.resolve(/*turbopackIgnore: true*/ process.env.ORBIT_DATA_DIR || path.join(process.cwd(), "data"));
 }
 
 const configFile = () => path.join(/*turbopackIgnore: true*/ dataDir(), "config.json");

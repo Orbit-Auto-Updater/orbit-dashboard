@@ -67,7 +67,7 @@ export function createDb(cfg: DbConfig): Kysely<DB> {
 }
 
 type Cached = { key: string; db: Kysely<DB>; ready: Promise<void> };
-const g = globalThis as unknown as { __linuxDashDb?: Cached };
+const g = globalThis as unknown as { __orbitDb?: Cached };
 
 export async function getDb(): Promise<Kysely<DB>> {
   const cfg = getDbConfig();
@@ -75,17 +75,17 @@ export async function getDb(): Promise<Kysely<DB>> {
   // The migration list is part of the key: when code with a new migration is
   // loaded (dev hot reload, or a long-running process) it gets applied.
   const key = JSON.stringify(cfg) + "|" + Object.keys(migrations).join(",");
-  if (g.__linuxDashDb?.key !== key) {
-    const old = g.__linuxDashDb;
+  if (g.__orbitDb?.key !== key) {
+    const old = g.__orbitDb;
     const db = createDb(cfg);
-    g.__linuxDashDb = { key, db, ready: migrateToLatest(db).then(() => (cfg.engine === "sqlite" ? compactIfBloated(db) : undefined)) };
+    g.__orbitDb = { key, db, ready: migrateToLatest(db).then(() => (cfg.engine === "sqlite" ? compactIfBloated(db) : undefined)) };
     old?.db.destroy().catch(() => {});
   }
-  const cur = g.__linuxDashDb!;
+  const cur = g.__orbitDb!;
   try {
     await cur.ready;
   } catch (err) {
-    if (g.__linuxDashDb === cur) g.__linuxDashDb = undefined; // retry next time
+    if (g.__orbitDb === cur) g.__orbitDb = undefined; // retry next time
     throw err;
   }
   return cur.db;

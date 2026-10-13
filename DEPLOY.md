@@ -1,4 +1,4 @@
-# Deploying Linux Dash with Docker
+# Deploying Orbit with Docker
 
 The image contains the dashboard and the agent's installer and binaries for amd64, arm64, arm and 386. That means `curl https://your-dashboard/install.sh | sudo sh` works as soon as it's up.
 
@@ -22,11 +22,11 @@ The image:
 ## Requirements
 
 - Docker Engine 24+ with Compose v2.17+. `additional_contexts` is used to pull in the agent source.
-- This repository and `linux-dash-agent` side by side:
+- This repository and `orbit-agent` side by side:
   ```
-  linux-dash/
-  ├── linux-dash/          ← you are here
-  └── linux-dash-agent/
+  orbit/
+  ├── orbit-dashboard/     ← you are here
+  └── orbit-agent/
   ```
 - Network access during the build (npm registry, Go module proxy, Google Fonts; fonts are bundled at build time).
 
@@ -68,33 +68,33 @@ docker compose -f compose.sqlite.yaml up -d --build
 docker compose -f compose.sqlite.yaml logs dashboard | grep "setup code"
 ```
 
-In the wizard, choose **SQLite** and keep the default path, `/data/linux-dash.db`. Put HTTPS in front before exposing it beyond the host.
+In the wizard, choose **SQLite** and keep the default path, `/data/orbit.db`. Put HTTPS in front before exposing it beyond the host.
 
 ## Building the image directly
 
 ```bash
-docker build --build-context agent=../linux-dash-agent --build-arg AGENT_VERSION=0.1.0 -t linux-dash:0.1.0 .
+docker build --build-context agent=../orbit-agent --build-arg AGENT_VERSION=0.1.0 -t orbit:0.1.0 .
 
 # multi-arch, pushed to a registry
 docker buildx build --platform linux/amd64,linux/arm64 \
-  --build-context agent=../linux-dash-agent -t registry.example.com/linux-dash:0.1.0 --push .
+  --build-context agent=../orbit-agent -t registry.example.com/orbit:0.1.0 --push .
 ```
 
 Run it on its own:
 ```bash
-docker run -d --name linux-dash -p 127.0.0.1:3000:3000 -v linux-dash-data:/data \
-  -e DATABASE_URL=postgres://user:pass@db:5432/linuxdash \
+docker run -d --name orbit -p 127.0.0.1:3000:3000 -v orbit-data:/data \
+  -e DATABASE_URL=postgres://user:pass@db:5432/orbit \
   --read-only --tmpfs /tmp --tmpfs /app/.next/cache:uid=10001,gid=10001 \
-  --cap-drop ALL --security-opt no-new-privileges linux-dash:0.1.0
+  --cap-drop ALL --security-opt no-new-privileges orbit:0.1.0
 ```
 
 ## Configuration
 
 | Variable | Default | |
 | --- | --- | --- |
-| `DATABASE_URL` | none | `postgres://…` or `sqlite:/data/linux-dash.db`. If unset, the setup wizard asks. |
+| `DATABASE_URL` | none | `postgres://…` or `sqlite:/data/orbit.db`. If unset, the setup wizard asks. |
 | `DATABASE_URL_FILE` | none | Read the URL from a file instead, e.g. a Docker secret at `/run/secrets/database_url`, so the password isn't in the environment. |
-| `LINUX_DASH_DATA_DIR` | `/data` | Config, setup code and SQLite database. Must be persistent. |
+| `ORBIT_DATA_DIR` | `/data` | Config, setup code and SQLite database. Must be persistent. |
 | `AGENT_DIST_DIR` | `/app/agent-dist` | Agent installer and binaries served at `/install.sh` and `/downloads/`. |
 | `PORT` / `HOSTNAME` | `3000` / `0.0.0.0` | Listen address inside the container. |
 | `TZ` | `UTC` | Log timestamps. |
@@ -105,9 +105,9 @@ docker run -d --name linux-dash -p 127.0.0.1:3000:3000 -v linux-dash-data:/data 
 
 **PostgreSQL:**
 ```bash
-docker compose exec -T postgres pg_dump -U linuxdash -Fc linuxdash > linux-dash-$(date +%F).dump
+docker compose exec -T postgres pg_dump -U orbit -Fc orbit > orbit-$(date +%F).dump
 # restore into an empty database:
-docker compose exec -T postgres pg_restore -U linuxdash -d linuxdash --clean < linux-dash-2026-10-12.dump
+docker compose exec -T postgres pg_restore -U orbit -d orbit --clean < orbit-2026-10-12.dump
 ```
 
 **SQLite.** This is an online backup, safe while the dashboard runs:
@@ -132,4 +132,4 @@ Database migrations run automatically when the new container starts. Rebuilding 
 - **Logs:** `docker compose logs -f dashboard` (JSON files rotated at 10 MB × 5).
 - **Health:** `docker compose ps` shows health status; `curl -s localhost:3000/api/health` returns `{"status":"ok","setup":"complete","database":"ok"}`.
 - **Lost the setup code?** `docker compose exec dashboard cat /data/setup-code`. It only exists until setup completes.
-- **Changing the Postgres password later:** the `postgres` image only applies `POSTGRES_PASSWORD` on first start. Change it with `ALTER USER linuxdash PASSWORD '…'`, then update `.env` and recreate the dashboard.
+- **Changing the Postgres password later:** the `postgres` image only applies `POSTGRES_PASSWORD` on first start. Change it with `ALTER USER orbit PASSWORD '…'`, then update `.env` and recreate the dashboard.

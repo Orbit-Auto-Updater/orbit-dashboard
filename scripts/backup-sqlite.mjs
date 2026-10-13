@@ -3,7 +3,7 @@
  * Online backup of the SQLite database (safe while the dashboard is running).
  *
  *   docker compose exec dashboard node scripts/backup-sqlite.mjs
- *   → /data/backups/linux-dash-YYYYMMDD-HHMMSS.db
+ *   → /data/backups/orbit-YYYYMMDD-HHMMSS.db
  *
  * PostgreSQL deployments should use pg_dump instead (see DEPLOY.md).
  */
@@ -11,9 +11,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
 
-const dataDir = process.env.LINUX_DASH_DATA_DIR || path.join(process.cwd(), "data");
+const dataDir = process.env.ORBIT_DATA_DIR || path.join(process.cwd(), "data");
 const url = process.env.DATABASE_URL || (process.env.DATABASE_URL_FILE ? fs.readFileSync(process.env.DATABASE_URL_FILE, "utf8").trim() : "");
-let source = path.join(dataDir, "linux-dash.db");
+let source = path.join(dataDir, "orbit.db");
 if (url) {
   const m = /^(?:sqlite|file):(?:\/\/)?(.+)$/i.exec(url);
   if (!m) {
@@ -37,7 +37,7 @@ if (!fs.existsSync(source)) {
 }
 
 const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
-const dest = process.argv[2] ?? path.join(dataDir, "backups", `linux-dash-${stamp}.db`);
+const dest = process.argv[2] ?? path.join(dataDir, "backups", `orbit-${stamp}.db`);
 fs.mkdirSync(path.dirname(dest), { recursive: true, mode: 0o700 });
 
 const db = new DatabaseSync(source, { readOnly: true });

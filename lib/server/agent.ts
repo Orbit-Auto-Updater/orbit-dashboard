@@ -1,5 +1,5 @@
 /**
- * Control-plane side of the agent protocol (see linux-dash-agent/docs/PROTOCOL.md):
+ * Control-plane side of the agent protocol (see orbit-agent/docs/PROTOCOL.md):
  * enrolment, authentication, report ingestion and command delivery.
  */
 import zlib from "node:zlib";

@@ -1,4 +1,4 @@
-/** TypeScript mirror of linux-dash-agent/internal/protocol (v1). */
+/** TypeScript mirror of orbit-agent/internal/protocol (v1). */
 
 export type HostInfo = {
   hostname: string;

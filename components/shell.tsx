@@ -75,7 +75,7 @@ function Logo({ org }: { org: string }) {
         </svg>
       </span>
       <span className="min-w-0 leading-tight">
-        <span className="block text-sm font-semibold tracking-tight">Linux Dash</span>
+        <span className="block text-sm font-semibold tracking-tight">Orbit</span>
         <span className="block truncate text-[11px] text-subtle">{org || "Fleet & patching"}</span>
       </span>
     </Link>

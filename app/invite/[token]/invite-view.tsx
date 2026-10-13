@@ -36,7 +36,7 @@ export function InviteView() {
   if (loadError) return <AuthCard title="Invite not valid"><FormError>{loadError}</FormError></AuthCard>;
   if (!invite) return <AuthCard title="Loading invite…"><p className="text-sm text-muted">One moment.</p></AuthCard>;
   return (
-    <AuthCard title={`Join ${invite.orgName || "Linux Dash"}`} subtitle={<>Welcome, {invite.name}. Choose a password for <span className="text-fg">{invite.email}</span>.</>}>
+    <AuthCard title={`Join ${invite.orgName || "Orbit"}`} subtitle={<>Welcome, {invite.name}. Choose a password for <span className="text-fg">{invite.email}</span>.</>}>
       <form onSubmit={submit} className="space-y-4">
         <FormError>{error}</FormError>
         <Field label="Password" hint="At least 10 characters">

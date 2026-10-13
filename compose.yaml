@@ -1,4 +1,4 @@
-# Linux Dash: production stack (dashboard + PostgreSQL, optional Caddy for HTTPS).
+# Orbit: production stack (dashboard + PostgreSQL, optional Caddy for HTTPS).
 #
 #   cp .env.example .env   # set POSTGRES_PASSWORD (and DOMAIN for HTTPS)
 #   docker compose up -d                    # dashboard on 127.0.0.1:3000
@@ -7,7 +7,7 @@
 #
 # See DEPLOY.md for details. For a single container with SQLite use compose.sqlite.yaml.
 
-name: linux-dash
+name: orbit
 
 x-hardening: &hardening
   restart: unless-stopped
@@ -22,12 +22,12 @@ services:
     build:
       context: .
       additional_contexts:
-        agent: ../linux-dash-agent
+        agent: ../orbit-agent
       args:
         AGENT_VERSION: ${AGENT_VERSION:-dev}
-    image: ${DASHBOARD_IMAGE:-linux-dash:latest}
+    image: ${DASHBOARD_IMAGE:-orbit:latest}
     environment:
-      DATABASE_URL: postgres://linuxdash:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/linuxdash
+      DATABASE_URL: postgres://orbit:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/orbit
       TZ: ${TZ:-UTC}
     volumes:
       - dashboard-data:/data
@@ -51,13 +51,13 @@ services:
     <<: *hardening
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: linuxdash
-      POSTGRES_USER: linuxdash
+      POSTGRES_DB: orbit
+      POSTGRES_USER: orbit
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U linuxdash -d linuxdash"]
+      test: ["CMD-SHELL", "pg_isready -U orbit -d orbit"]
       interval: 10s
       timeout: 5s
       retries: 10

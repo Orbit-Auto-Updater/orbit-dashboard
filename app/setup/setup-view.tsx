@@ -59,7 +59,7 @@ export function SetupView() {
   if (finished) return <Finished {...finished} />;
 
   return (
-    <AuthCard title="Set up Linux Dash" subtitle="A few steps to connect a database and create your account." wide>
+    <AuthCard title="Set up Orbit" subtitle="A few steps to connect a database and create your account." wide>
       <ol className="mb-8 grid grid-cols-4 gap-2">
         {STEPS.map((s, i) => {
           const idx = STEPS.findIndex((x) => x.id === step);
@@ -138,7 +138,7 @@ function CodeStep({ onSubmit }: { onSubmit: (code: string) => Promise<void> }) {
 function DatabaseStep({ status, headers, onDone }: { status: Status; headers: Record<string, string>; onDone: () => void }) {
   const [engine, setEngine] = useState<"sqlite" | "postgres">("sqlite");
   const [sqlitePath, setSqlitePath] = useState(status.defaults.sqlitePath);
-  const [pg, setPg] = useState({ host: "localhost", port: "5432", database: "linuxdash", user: "linuxdash", password: "", ssl: "disable", url: "" });
+  const [pg, setPg] = useState({ host: "localhost", port: "5432", database: "orbit", user: "orbit", password: "", ssl: "disable", url: "" });
   const [useUrl, setUseUrl] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; error?: string; version?: string; target?: string; tables?: string[] } | null>(null);
   const [busy, setBusy] = useState<"test" | "save" | null>(null);
@@ -229,7 +229,7 @@ function DatabaseStep({ status, headers, onDone }: { status: Status; headers: Re
               </label>
               {useUrl ? (
                 <Field label="Connection URL">
-                  <input className={cn(inputClass, "font-mono text-xs")} placeholder="postgres://user:password@host:5432/linuxdash" value={pg.url} onChange={(e) => setPg({ ...pg, url: e.target.value })} />
+                  <input className={cn(inputClass, "font-mono text-xs")} placeholder="postgres://user:password@host:5432/orbit" value={pg.url} onChange={(e) => setPg({ ...pg, url: e.target.value })} />
                 </Field>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-6">
